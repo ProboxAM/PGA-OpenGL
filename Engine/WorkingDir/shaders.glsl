@@ -8,18 +8,12 @@
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec2 aTextCoord;
 
-out vex2 vTexCoord;
+out vec2 vTexCoord;
 
 void main()
 {
     vTexCoord = aTextCoord;
-
-    float clippingScale = 5.0;
-
-    gl_Position = vec4(aPosition, clippingScale);
-
-    gl_Position.z = -gl_Position.z;
-
+    gl_Position = vec4(aPosition, 1.0);
 }
 
 #elif defined(FRAGMENT) ///////////////////////////////////////////////

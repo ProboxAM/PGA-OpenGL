@@ -28,12 +28,17 @@ struct Texture
     std::string filepath;
 };
 
-struct Program
+struct Material
 {
-    GLuint             handle;
-    std::string        filepath;
-    std::string        programName;
-    u64                lastWriteTimestamp; // What is this for?
+    std::string name;
+    vec3        albedo;
+    vec3        emissive;
+    f32         smoothnes;
+    u32         albedoTextureIdx;
+    u32         emissiveTextureIdx;
+    u32         specularTextureIdx;
+    u32         normalsTextureIdx;
+    u32         bumpTextureIdx;
 };
 
 struct VertexV3V2 {
@@ -69,6 +74,39 @@ struct Vao
     GLuint programHandle;
 };
 
+struct Model
+{
+    u32              meshIdx;
+    std::vector<u32> materialIdx;
+};
+
+struct Submesh
+{
+    VertexBufferLayout vertexBufferLayout;
+    std::vector<VertexV3V2> vertices;
+    std::vector<u16>   indices;
+    u32                vertexOffset;
+    u32                indexOffset;
+
+    std::vector<Vao>   vaos;
+};
+
+struct Mesh
+{
+    std::vector<Submesh> submeshes;
+    GLuint vertexBufferHandle;
+    GLuint indexBufferHandle;
+};
+
+struct Program
+{
+    GLuint             handle;
+    std::string        filepath;
+    std::string        programName;
+    VertexShaderLayout vertexInputLayout;
+    u64                lastWriteTimestamp; // What is this for?
+};
+
 enum Mode
 {
     Mode_TexturedQuad,
@@ -91,10 +129,14 @@ struct App
     ivec2 displaySize;
 
     std::vector<Texture>  textures;
+    std::vector<Material> materials;
+    std::vector<Mesh>     meshes;
+    std::vector<Model>    models;
     std::vector<Program>  programs;
 
     // program indices
     u32 texturedGeometryProgramIdx;
+    u32 texturedMeshProgramIdx;
     
     // texture indices
     u32 diceTexIdx;
@@ -102,6 +144,9 @@ struct App
     u32 blackTexIdx;
     u32 normalTexIdx;
     u32 magentaTexIdx;
+
+    // mesh index
+    u32 meshIdx;
 
     // Mode
     Mode mode;

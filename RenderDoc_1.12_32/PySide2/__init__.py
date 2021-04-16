@@ -4,7 +4,7 @@ __all__ = list("Qt" + body for body in
 __version__         = "2.0.0~alpha0"
 __version_info__    = (2, 0, 0, "alpha", 0)
 
-__build_date__ = '2018-02-02T17:32:03+00:00'
+__build_date__ = '2018-02-02T15:56:48+00:00'
 __build_commit_date__ = '2018-02-02T12:55:01+00:00'
 __build_commit_hash__ = '4b2ef72f0461fbce539d6a1bd69d8c0ed7041025'
 __build_commit_hash_described__ = '2.0.0.dev0-5149-g4b2ef72'
