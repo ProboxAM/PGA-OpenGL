@@ -33,7 +33,7 @@ struct Material
     std::string name;
     vec3        albedo;
     vec3        emissive;
-    f32         smoothnes;
+    f32         smoothness;
     u32         albedoTextureIdx;
     u32         emissiveTextureIdx;
     u32         specularTextureIdx;
@@ -83,7 +83,7 @@ struct Model
 struct Submesh
 {
     VertexBufferLayout vertexBufferLayout;
-    std::vector<VertexV3V2> vertices;
+    std::vector<float> vertices;
     std::vector<u16>   indices;
     u32                vertexOffset;
     u32                indexOffset;
@@ -110,6 +110,8 @@ struct Program
 enum Mode
 {
     Mode_TexturedQuad,
+    Mode_Primitive,
+    Mode_AssimpModel,
     Mode_Count
 };
 
@@ -145,8 +147,12 @@ struct App
     u32 normalTexIdx;
     u32 magentaTexIdx;
 
-    // mesh index
-    u32 meshIdx;
+    // model index
+    u32 patrickIdx;
+
+    //model primitives
+    u32 sphereIdx;
+    u32 quadIdx;
 
     // Mode
     Mode mode;
@@ -172,4 +178,6 @@ void Update(App* app);
 void Render(App* app);
 
 void OnGlError(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParan);
+
+u32 LoadTexture2D(App* app, const char* filepath);
 
