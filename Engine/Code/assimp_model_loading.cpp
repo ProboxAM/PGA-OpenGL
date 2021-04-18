@@ -4,7 +4,7 @@
 void ProcessAssimpMesh(const aiScene* scene, aiMesh *mesh, Mesh *myMesh, u32 baseMeshMaterialIndex, std::vector<u32>& submeshMaterialIndices)
 {
     std::vector<float> vertices;
-    std::vector<u16> indices;
+    std::vector<u32> indices;
 
     bool hasTexCoords = false;
     bool hasTangentSpace = false;
@@ -209,7 +209,7 @@ u32 LoadModel(App* app, const char* filename)
     for (u32 i = 0; i < mesh.submeshes.size(); ++i)
     {
         vertexBufferSize += mesh.submeshes[i].vertices.size() * sizeof(float);
-        indexBufferSize  += mesh.submeshes[i].indices.size()  * sizeof(u16);
+        indexBufferSize  += mesh.submeshes[i].indices.size()  * sizeof(u32);
     }
 
     glGenBuffers(1, &mesh.vertexBufferHandle);
@@ -232,7 +232,7 @@ u32 LoadModel(App* app, const char* filename)
         verticesOffset += verticesSize;
 
         const void* indicesData = mesh.submeshes[i].indices.data();
-        const u32   indicesSize = mesh.submeshes[i].indices.size() * sizeof(u16);
+        const u32   indicesSize = mesh.submeshes[i].indices.size() * sizeof(u32);
         glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, indicesOffset, indicesSize, indicesData);
         mesh.submeshes[i].indexOffset = indicesOffset;
         indicesOffset += indicesSize;

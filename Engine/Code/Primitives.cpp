@@ -30,7 +30,7 @@ u32 LoadSphere(App* app)
         }
     }
     
-    std::vector<u16> indices = {
+    std::vector<u32> indices = {
     };
 
     for (unsigned int h = 0; h < H; ++h) {
@@ -74,14 +74,14 @@ u32 LoadSphere(App* app)
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, myMesh.indexBufferHandle);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u16) * myMesh.submeshes[i].indices.size(), &myMesh.submeshes[i].indices[0], GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * myMesh.submeshes[i].indices.size(), &myMesh.submeshes[i].indices[0], GL_STATIC_DRAW);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
         submesh.vertexOffset = verticesOffset;
         submesh.indexOffset = indicesOffset;
 
         verticesOffset += sizeof(float) * myMesh.submeshes[i].vertices.size();
-        indicesOffset += sizeof(u16) * myMesh.submeshes[i].indices.size();
+        indicesOffset += sizeof(u32) * myMesh.submeshes[i].indices.size();
     }
 
     Model myModel = {};
@@ -107,13 +107,13 @@ u32 LoadSphere(App* app)
 u32 LoadQuad(App* app)
 {
     std::vector<float> vertices = {
-    -0.5, -0.5, 0.0, 0.0, 0.0, // bottom-left
-    0.5, -0.5, 0.0, 1.0, 0.0, // bottom-right
-    0.5, 0.5, 0.0, 1.0, 1.0, // top-right
-    -0.5, 0.5, 0.0, 0.0, 1.0 // top-left
+    -0.5, -0.5, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, // bottom-left
+    0.5, -0.5, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, // bottom-right
+    0.5, 0.5, 0.0, 0.0, 0.0, -1.0, 1.0, 1.0, // top-right
+    -0.5, 0.5, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0 // top-left
     };
 
-    std::vector<u16> indices = {
+    std::vector<u32> indices = {
         0, 1, 2,
         0, 2, 3
     };
@@ -122,9 +122,10 @@ u32 LoadQuad(App* app)
 
     //create the vertex format
     VertexBufferLayout vertexBufferLayout = {};
-    vertexBufferLayout.attributes.push_back(VertexBufferAttribute{ 0, 3, 0 }); //3d positions
-    vertexBufferLayout.attributes.push_back(VertexBufferAttribute{ 1, 2, 3*sizeof(float) }); //tex coords
-    vertexBufferLayout.stride = 5 * sizeof(float);
+    vertexBufferLayout.attributes.push_back(VertexBufferAttribute{ 0, 3, 0 });
+    vertexBufferLayout.attributes.push_back(VertexBufferAttribute{ 1, 3, 3 * sizeof(float) });
+    vertexBufferLayout.attributes.push_back(VertexBufferAttribute{ 2, 2, 6 * sizeof(float) });
+    vertexBufferLayout.stride = 8 * sizeof(float);
 
     //add the submesh into the mesh
     Submesh submesh = {};
@@ -148,14 +149,14 @@ u32 LoadQuad(App* app)
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, myMesh.indexBufferHandle);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u16) * myMesh.submeshes[i].indices.size(), &myMesh.submeshes[i].indices[0], GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * myMesh.submeshes[i].indices.size(), &myMesh.submeshes[i].indices[0], GL_STATIC_DRAW);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
         submesh.vertexOffset = verticesOffset;
         submesh.indexOffset = indicesOffset;
 
         verticesOffset += sizeof(float) * myMesh.submeshes[i].vertices.size();
-        indicesOffset += sizeof(u16) * myMesh.submeshes[i].indices.size();
+        indicesOffset += sizeof(u32) * myMesh.submeshes[i].indices.size();
     }
 
     Model myModel;
@@ -167,7 +168,7 @@ u32 LoadQuad(App* app)
 
     Material myMat;
     myMat.albedo = vec3(1.0f, 1.0f, 1.0f);
-    myMat.albedoTextureIdx = app->diceTexIdx;
+    myMat.albedoTextureIdx = app->whiteTexIdx;
 
     u32 materialIdx = app->materials.size();
     app->materials.push_back(myMat);

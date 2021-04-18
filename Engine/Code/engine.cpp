@@ -258,20 +258,22 @@ void Init(App* app)
     // - programs (and retrieve uniform indices)
     // - textures
 
+    //Load Textures
     app->diceTexIdx = LoadTexture2D(app, "dice.png");
     app->whiteTexIdx = LoadTexture2D(app, "color_white.png");
     app->blackTexIdx = LoadTexture2D(app, "color_black.png");
     app->normalTexIdx = LoadTexture2D(app, "color_normal.png");
     app->magentaTexIdx = LoadTexture2D(app, "color_magenta.png");
 
-    app->patrickIdx = LoadModel(app,
-        "Patrick/Patrick.obj");
-
+    //Load Models/Primitives
     app->quadIdx = LoadQuad(app);
-
     app->sphereIdx = LoadSphere(app);
+    app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
 
-    ////create the mesh
+    //Create entities
+    app->entities.push_back(Entity{ glm::identity<glm::mat4>(), app->patrickIdx, 0, 0 }); //Patrick 1
+    app->entities.push_back(Entity{ glm::identity<glm::mat4>(), app->quadIdx, 0, 0 }); //Floor
+
 
     std::string shaderMode = "SHOW_TEXTURED_MESH";
 
@@ -341,28 +343,33 @@ void Render(App* app)
                 Program& texturedMeshProgram = app->programs[app->texturedMeshProgramIdx];
                 glUseProgram(texturedMeshProgram.handle);
 
-                Model& model = app->models[app->sphereIdx];
-                Mesh& mesh = app->meshes[model.meshIdx];
-
-                for (u32 i = 0; i < mesh.submeshes.size(); ++i)
+                for(Entity entity : app->entities)
                 {
-                    GLuint vao = FindVAO(mesh, i, texturedMeshProgram);
-                    glBindVertexArray(vao);
+                    Model& model = app->models[entity.modelIndex];
+                    Mesh& mesh = app->meshes[model.meshIdx];
 
-                    glEnable(GL_BLEND);
-                    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                    for (u32 i = 0; i < mesh.submeshes.size(); ++i)
+                    {
+                        GLuint vao = FindVAO(mesh, i, texturedMeshProgram);
+                        glBindVertexArray(vao);
 
-                    u32 submeshMaterialIdx = model.materialIdx[i];
-                    Material& submeshMaterial = app->materials[submeshMaterialIdx];
-                    glUniform1i(app->programUniformTexture, 0);
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+                        glEnable(GL_BLEND);
+                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-                    Submesh& submesh = mesh.submeshes[i];
-                    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_SHORT, (void*)(u64)submesh.indexOffset);
+                        u32 submeshMaterialIdx = model.materialIdx[i];
+                        Material& submeshMaterial = app->materials[submeshMaterialIdx];
+                        glUniform1i(app->programUniformTexture, 0);
+                        glActiveTexture(GL_TEXTURE0);
+                        glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+
+                        Submesh& submesh = mesh.submeshes[i];
+                        glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+                    }
+
+                    glBindVertexArray(0);
                 }
 
-                glBindVertexArray(0);
+                
                 glUseProgram(0);
             }
             break;

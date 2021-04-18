@@ -84,7 +84,7 @@ struct Submesh
 {
     VertexBufferLayout vertexBufferLayout;
     std::vector<float> vertices;
-    std::vector<u16>   indices;
+    std::vector<u32>   indices;
     u32                vertexOffset;
     u32                indexOffset;
 
@@ -105,6 +105,14 @@ struct Program
     std::string        programName;
     VertexShaderLayout vertexInputLayout;
     u64                lastWriteTimestamp; // What is this for?
+};
+
+struct Entity
+{
+    glm::mat4 worldMatrix;
+    u32       modelIndex;
+    u32       localParamsOffset;
+    u32       localParamsSize;
 };
 
 enum Mode
@@ -135,6 +143,7 @@ struct App
     std::vector<Mesh>     meshes;
     std::vector<Model>    models;
     std::vector<Program>  programs;
+    std::vector<Entity>   entities;
 
     // program indices
     u32 texturedGeometryProgramIdx;
@@ -150,7 +159,7 @@ struct App
     // model index
     u32 patrickIdx;
 
-    //model primitives
+    // model primitives index
     u32 sphereIdx;
     u32 quadIdx;
 
