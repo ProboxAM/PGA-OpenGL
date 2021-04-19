@@ -12,6 +12,8 @@
 #include <stb_image_write.h>
 #include "assimp_model_loading.h"
 
+#define BINDING(b) b
+
 GLuint CreateProgramFromSource(String programSource, const char* shaderName)
 {
     GLchar  infoLogBuffer[1024] = {};
@@ -192,6 +194,23 @@ u32 LoadTexture2D(App* app, const char* filepath)
     }
 }
 
+glm::mat4 TransformScale(const vec3& scaleFactors)
+{
+    glm::mat4 transform = scale(scaleFactors);
+    return scale(scaleFactors);
+}
+
+glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactors)
+{
+    glm::mat4 transform = translate(pos);
+    transform = scale(transform, scaleFactors);
+    return transform;
+}
+
+
+u32 Align(u32 value, u32 alignement) {
+    return (value + alignement - 1) & ~(alignement - 1);
+}
 
 GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program)
 {
@@ -271,8 +290,9 @@ void Init(App* app)
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
 
     //Create entities
-    app->entities.push_back(Entity{ glm::identity<glm::mat4>(), app->patrickIdx, 0, 0 }); //Patrick 1
-    app->entities.push_back(Entity{ glm::identity<glm::mat4>(), app->quadIdx, 0, 0 }); //Floor
+    app->entities.push_back(Entity{ TransformPositionScale({5, 0, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.push_back(Entity{ glm::identity<glm::mat4>(), app->quadIdx}); //Floor
+    app->entities.push_back(Entity{ TransformPositionScale({-5, 0, 0}, {2.0, 2.0, 2.0}), app->sphereIdx}); //Sphere
 
 
     std::string shaderMode = "SHOW_TEXTURED_MESH";
@@ -304,6 +324,14 @@ void Init(App* app)
 
     
 
+    glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &app->maxUniformBufferSize);
+    glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->maxUniformBufferSize);
+
+    glGenBuffers(1, &app->uniformBufferHandle);
+    glBindBuffer(GL_UNIFORM_BUFFER, app->uniformBufferHandle);
+    glBufferData(GL_UNIFORM_BUFFER, app->maxUniformBufferSize, NULL, GL_STREAM_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
     app->mode = Mode_TexturedQuad;
 }
 
@@ -316,8 +344,39 @@ void Gui(App* app)
 
 void Update(App* app)
 {
+    glm::mat4 projection, view;
     // You can handle app->input keyboard/mouse here
+    float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
+    vec3 upVector = { 0, 1, 0 };
+    projection = glm::perspective(glm::radians(app->camera.vfov), aspectRatio, app->camera.nearPlane, app->camera.farPlane);
+    view = glm::lookAt(app->camera.position, app->camera.target, upVector);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, app->uniformBufferHandle);
+    u8* bufferData = (u8*)glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
+    u32 bufferHead = 0;
+
+    for(Entity e : app->entities)
+    {
+        bufferHead = Align(bufferHead, app->uniformBlockAlignment);
+        e.localParamsOffset = bufferHead;
+
+        memcpy(bufferData + bufferHead, glm::value_ptr(e.worldMatrix), sizeof(glm::mat4));
+        bufferHead += sizeof(glm::mat4);
+
+        glm::mat4 worldViewProjectionMatrix = projection * view * e.worldMatrix;
+
+        memcpy(bufferData + bufferHead, glm::value_ptr(worldViewProjectionMatrix), sizeof(glm::mat4));
+        bufferHead += sizeof(glm::mat4);
+
+        e.localParamsSize = bufferHead - e.localParamsOffset;
+
+        glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->uniformBufferHandle, e.localParamsOffset, e.localParamsSize);
+    }
+
+    glUnmapBuffer(GL_UNIFORM_BUFFER);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
+
 
 void Render(App* app)
 {

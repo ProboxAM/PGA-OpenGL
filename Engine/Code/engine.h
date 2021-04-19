@@ -115,6 +115,16 @@ struct Entity
     u32       localParamsSize;
 };
 
+struct Camera
+{
+    vec3 position = {0, 0, -10};
+    vec3 rotationEuler = { 0, 0, 0 };
+    vec3 target = { 0, 0, 0 };
+    float vfov = 60.0f;
+    float nearPlane = 0.1f;
+    float farPlane = 1000.0f;
+};
+
 enum Mode
 {
     Mode_TexturedQuad,
@@ -135,6 +145,9 @@ struct App
     // Graphics
     char gpuName[64];
     char openGlVersion[64];
+
+    // Camera
+    Camera camera = {};
 
     ivec2 displaySize;
 
@@ -174,6 +187,10 @@ struct App
     // Location of the texture uniform in the textured quad shader
     GLuint programUniformTexture;
 
+    // Uniform buffer
+    GLuint uniformBufferHandle;
+    GLint maxUniformBufferSize, uniformBlockAlignment;
+
     // VAO object to link our screen filling quad with our textured quad shader
     GLuint vao;
 };
@@ -189,4 +206,8 @@ void Render(App* app);
 void OnGlError(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParan);
 
 u32 LoadTexture2D(App* app, const char* filepath);
+
+glm::mat4 TransformScale(const vec3& scaleFactors);
+glm::mat4 TransformPositionScale(const vec3 &pos, const vec3& scaleFactors);
+
 
