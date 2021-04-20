@@ -207,6 +207,12 @@ glm::mat4 TransformPositionScale(const vec3& pos, const vec3& scaleFactors)
     return transform;
 }
 
+glm::mat4 TransformRotation(const glm::mat4& matrix, float angle, vec3 axis)
+{
+    float radians = glm::radians(angle);
+    glm::mat4 transform = glm::rotate(matrix, radians, axis);
+    return transform;
+}
 
 u32 Align(u32 value, u32 alignement) {
     return (value + alignement - 1) & ~(alignement - 1);
@@ -270,6 +276,8 @@ void Init(App* app)
     if (GLVersion.major > 4 || GLVersion.major == 4 && GLVersion.minor >= 3) {
         glDebugMessageCallback(OnGlError, app);
     }
+
+    glEnable(GL_DEPTH_TEST);
     // TODO: Initialize your resources here!
     // - vertex buffers
     // - element/index buffers
@@ -289,10 +297,20 @@ void Init(App* app)
     app->sphereIdx = LoadSphere(app);
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
 
+    //Camera
+    app->camera.position = { -3, 5, -15 };
+
+
     //Create entities
     app->entities.push_back(Entity{ TransformPositionScale({5, 0, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.push_back(Entity{ glm::identity<glm::mat4>(), app->quadIdx}); //Floor
-    app->entities.push_back(Entity{ TransformPositionScale({-5, 0, 0}, {2.0, 2.0, 2.0}), app->sphereIdx}); //Sphere
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({0, 0, 3}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({-5, 0, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({0, -5, 0}, {100.0, 1.0, 100.0}), app->quadIdx}); //Floor
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 88, { 1, 0, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({-5, 5, 0}, {1.0, 1.0, 1.0}), app->sphereIdx}); //Sphere
 
 
     std::string shaderMode = "SHOW_TEXTURED_MESH";
@@ -325,7 +343,7 @@ void Init(App* app)
     
 
     glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &app->maxUniformBufferSize);
-    glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->maxUniformBufferSize);
+    glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->uniformBlockAlignment);
 
     glGenBuffers(1, &app->uniformBufferHandle);
     glBindBuffer(GL_UNIFORM_BUFFER, app->uniformBufferHandle);
@@ -355,7 +373,7 @@ void Update(App* app)
     u8* bufferData = (u8*)glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
     u32 bufferHead = 0;
 
-    for(Entity e : app->entities)
+    for(Entity &e : app->entities)
     {
         bufferHead = Align(bufferHead, app->uniformBlockAlignment);
         e.localParamsOffset = bufferHead;
@@ -369,8 +387,6 @@ void Update(App* app)
         bufferHead += sizeof(glm::mat4);
 
         e.localParamsSize = bufferHead - e.localParamsOffset;
-
-        glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->uniformBufferHandle, e.localParamsOffset, e.localParamsSize);
     }
 
     glUnmapBuffer(GL_UNIFORM_BUFFER);
@@ -402,10 +418,12 @@ void Render(App* app)
                 Program& texturedMeshProgram = app->programs[app->texturedMeshProgramIdx];
                 glUseProgram(texturedMeshProgram.handle);
 
-                for(Entity entity : app->entities)
+                for(const Entity &entity : app->entities)
                 {
                     Model& model = app->models[entity.modelIndex];
                     Mesh& mesh = app->meshes[model.meshIdx];
+
+                    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->uniformBufferHandle, entity.localParamsOffset, entity.localParamsSize);
 
                     for (u32 i = 0; i < mesh.submeshes.size(); ++i)
                     {
