@@ -11,6 +11,7 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 #include "assimp_model_loading.h"
+#include "buffer_management.h"
 
 #define BINDING(b) b
 
@@ -214,10 +215,6 @@ glm::mat4 TransformRotation(const glm::mat4& matrix, float angle, vec3 axis)
     return transform;
 }
 
-u32 Align(u32 value, u32 alignement) {
-    return (value + alignement - 1) & ~(alignement - 1);
-}
-
 GLuint FindVAO(Mesh& mesh, u32 submeshIndex, const Program& program)
 {
     Submesh& submesh = mesh.submeshes[submeshIndex];
@@ -300,7 +297,6 @@ void Init(App* app)
     //Camera
     app->camera.position = { -3, 5, -15 };
 
-
     //Create entities
     app->entities.push_back(Entity{ TransformPositionScale({5, 0, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
@@ -312,6 +308,11 @@ void Init(App* app)
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 88, { 1, 0, 0 });
     app->entities.push_back(Entity{ TransformPositionScale({-5, 5, 0}, {1.0, 1.0, 1.0}), app->sphereIdx}); //Sphere
 
+    //Create lights
+    app->lights.push_back(Light{ LightType_Directional, {1.0, 1.0, 1.0}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} });
+    app->lights.push_back(Light{ LightType_Point, {1.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {-5.0, 0.0, -2.5} });
+    app->lights.push_back(Light{ LightType_Point, {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}, {0, 0.0, 0.0} });
+    app->lights.push_back(Light{ LightType_Point, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {5.0, 0.0, -2.5} });
 
     std::string shaderMode = "SHOW_TEXTURED_MESH";
 
@@ -338,17 +339,12 @@ void Init(App* app)
         texturedGeometryProgram.vertexInputLayout.attributes.push_back({ attributeLocation, GetSizeFromType(attributeType) });
     }
 
-    app->programUniformTexture = glGetUniformLocation(texturedGeometryProgram.handle, "uTexture");
-
-    
+    app->programUniformTexture = glGetUniformLocation(texturedGeometryProgram.handle, "uTexture");  
 
     glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &app->maxUniformBufferSize);
-    glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->uniformBlockAlignment);
+    glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->uniformBufferAlignment);
 
-    glGenBuffers(1, &app->uniformBufferHandle);
-    glBindBuffer(GL_UNIFORM_BUFFER, app->uniformBufferHandle);
-    glBufferData(GL_UNIFORM_BUFFER, app->maxUniformBufferSize, NULL, GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    app->cbuffer = CreateConstantBuffer(app->maxUniformBufferSize);
 
     app->mode = Mode_TexturedQuad;
 }
@@ -369,28 +365,40 @@ void Update(App* app)
     projection = glm::perspective(glm::radians(app->camera.vfov), aspectRatio, app->camera.nearPlane, app->camera.farPlane);
     view = glm::lookAt(app->camera.position, app->camera.target, upVector);
 
-    glBindBuffer(GL_UNIFORM_BUFFER, app->uniformBufferHandle);
-    u8* bufferData = (u8*)glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
-    u32 bufferHead = 0;
+    MapBuffer(app->cbuffer, GL_WRITE_ONLY);
 
-    for(Entity &e : app->entities)
+    // -- Global params
+    app->globalParamsOffset = app->cbuffer.head;
+    PushVec3(app->cbuffer, app->camera.position);
+    PushUInt(app->cbuffer, app->lights.size());
+
+    for (u32 i = 0; i < app->lights.size(); ++i)
     {
-        bufferHead = Align(bufferHead, app->uniformBlockAlignment);
-        e.localParamsOffset = bufferHead;
+        AlignHead(app->cbuffer, sizeof(vec4));
 
-        memcpy(bufferData + bufferHead, glm::value_ptr(e.worldMatrix), sizeof(glm::mat4));
-        bufferHead += sizeof(glm::mat4);
-
-        glm::mat4 worldViewProjectionMatrix = projection * view * e.worldMatrix;
-
-        memcpy(bufferData + bufferHead, glm::value_ptr(worldViewProjectionMatrix), sizeof(glm::mat4));
-        bufferHead += sizeof(glm::mat4);
-
-        e.localParamsSize = bufferHead - e.localParamsOffset;
+        Light& light = app->lights[i];
+        PushUInt(app->cbuffer, light.type);
+        PushVec3(app->cbuffer, light.color);
+        PushVec3(app->cbuffer, light.direction);
+        PushVec3(app->cbuffer, light.position);
     }
 
-    glUnmapBuffer(GL_UNIFORM_BUFFER);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    app->globalParamsSize = app->cbuffer.head - app->globalParamsOffset;
+
+    // -- Local params
+    for(Entity &e : app->entities)
+    {
+        AlignHead(app->cbuffer, app->uniformBufferAlignment);
+        glm::mat4 world = e.worldMatrix;
+        glm::mat4 worldViewProjection = projection * view * world;
+
+        e.localParamsOffset = app->cbuffer.head;
+        PushMat4(app->cbuffer, world);
+        PushMat4(app->cbuffer, worldViewProjection);
+        e.localParamsSize = app->cbuffer.head - e.localParamsOffset;
+    }
+
+    UnmapBuffer(app->cbuffer);
 }
 
 
@@ -418,12 +426,14 @@ void Render(App* app)
                 Program& texturedMeshProgram = app->programs[app->texturedMeshProgramIdx];
                 glUseProgram(texturedMeshProgram.handle);
 
+                glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
+
                 for(const Entity &entity : app->entities)
                 {
                     Model& model = app->models[entity.modelIndex];
                     Mesh& mesh = app->meshes[model.meshIdx];
 
-                    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->uniformBufferHandle, entity.localParamsOffset, entity.localParamsSize);
+                    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, entity.localParamsOffset, entity.localParamsSize);
 
                     for (u32 i = 0; i < mesh.submeshes.size(); ++i)
                     {
@@ -445,8 +455,7 @@ void Render(App* app)
 
                     glBindVertexArray(0);
                 }
-
-                
+          
                 glUseProgram(0);
             }
             break;

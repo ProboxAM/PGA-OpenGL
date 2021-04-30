@@ -14,6 +14,15 @@ typedef glm::ivec2 ivec2;
 typedef glm::ivec3 ivec3;
 typedef glm::ivec4 ivec4;
 
+struct Buffer
+{
+    GLuint handle;
+    GLenum type;
+    u32 size; 
+    u32 head;
+    void* data; //mapped data
+};
+
 struct Image
 {
     void* pixels;
@@ -91,6 +100,20 @@ struct Submesh
     std::vector<Vao>   vaos;
 };
 
+enum LightType
+{
+    LightType_Directional,
+    LightType_Point
+};
+
+struct Light
+{
+    int type;
+    vec3 color; 
+    vec3 direction;
+    vec3 position;
+};
+
 struct Mesh
 {
     std::vector<Submesh> submeshes;
@@ -157,6 +180,7 @@ struct App
     std::vector<Model>    models;
     std::vector<Program>  programs;
     std::vector<Entity>   entities;
+    std::vector<Light>    lights;
 
     // program indices
     u32 texturedGeometryProgramIdx;
@@ -188,8 +212,11 @@ struct App
     GLuint programUniformTexture;
 
     // Uniform buffer
-    GLuint uniformBufferHandle;
-    GLint maxUniformBufferSize, uniformBlockAlignment;
+    Buffer cbuffer;
+    GLint maxUniformBufferSize, uniformBufferAlignment;
+
+    GLuint globalParamsOffset; //offset for global params in uniform buffer
+    GLuint globalParamsSize; //size of global params in uniform buffer
 
     // VAO object to link our screen filling quad with our textured quad shader
     GLuint vao;
