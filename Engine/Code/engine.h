@@ -160,8 +160,8 @@ enum RenderTarget
 {
     RT_Final,
     RT_Diffuse,
-    RT_Depth,
-    RT_Normal
+    RT_Normals,
+    RT_Depth
 };
 
 struct App
@@ -211,7 +211,7 @@ struct App
 
     // Mode
     Mode mode;
-    RenderTarget renderTarget = RenderTarget::RT_Diffuse;
+    RenderTarget renderTarget = RenderTarget::RT_Final;
 
     // Embedded geometry (in-editor simple meshes such as
     // a screen filling quad, a cube, a sphere...)

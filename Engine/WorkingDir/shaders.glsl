@@ -58,7 +58,7 @@ layout(location = 0) out vec4 oColor;
 void main()
 {
     float d = texture(uTexture, vTexCoord).r;
-    oColor = vec4(d, d, d, 1.0f);
+    oColor = vec4(1-pow(d,100), 1-pow(d,100), 1-pow(d,100), 1.0f);
 }
 
 #endif

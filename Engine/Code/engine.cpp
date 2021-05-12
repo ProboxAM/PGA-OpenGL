@@ -370,6 +370,17 @@ void Init(App* app)
 void Gui(App* app)
 {
     ImGui::Begin("Info");
+
+    {
+        static const char* selections[]{"Final Render", "Diffuse", "Normals", "Depth"};
+        static int selectedTarget = 0;
+
+        if (ImGui::Combo("RenderTarget", &selectedTarget, selections, ARRAY_COUNT(selections)))
+        {
+            app->renderTarget = (RenderTarget)selectedTarget;
+        }
+    }
+
     ImGui::Text("FPS: %f", 1.0f/app->deltaTime);
     ImGui::End();
 }
@@ -422,6 +433,7 @@ void Update(App* app)
 
 void Render(App* app)
 {
+    glEnable(GL_DEPTH_TEST);
     switch (app->mode)
     {
         case Mode_TexturedQuad:
@@ -483,6 +495,7 @@ void Render(App* app)
     }
 
     //QUAD RENDERING
+    glDisable(GL_DEPTH_TEST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -532,7 +545,7 @@ void Render(App* app)
             glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
 
         }break;
-        case RenderTarget::RT_Normal:
+        case RenderTarget::RT_Normals:
         {
             Program& program = app->programs[app->texturedQuadProgramIdx];
             glUseProgram(program.handle);
