@@ -6,7 +6,7 @@
 #if defined(VERTEX) ///////////////////////////////////////////////////
 
 layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec2 aTextCoord;
+layout(location = 2) in vec2 aTextCoord;
 
 out vec2 vTexCoord;
 
@@ -27,6 +27,38 @@ layout(location = 0) out vec4 oColor;
 void main()
 {
     oColor = texture(uTexture, vTexCoord);
+}
+
+#endif
+#endif
+
+#ifdef TEXTURED_DEPTH
+
+#if defined(VERTEX) ///////////////////////////////////////////////////
+
+layout(location = 0) in vec3 aPosition;
+layout(location = 2) in vec2 aTextCoord;
+
+out vec2 vTexCoord;
+
+void main()
+{
+    vTexCoord = aTextCoord;
+    gl_Position = vec4(aPosition, 1.0);
+}
+
+#elif defined(FRAGMENT) ///////////////////////////////////////////////
+
+in vec2 vTexCoord;
+
+uniform sampler2D uTexture;
+
+layout(location = 0) out vec4 oColor;
+
+void main()
+{
+    float d = texture(uTexture, vTexCoord).r;
+    oColor = vec4(d, d, d, 1.0f);
 }
 
 #endif
@@ -97,6 +129,8 @@ layout(binding = 0, std140) uniform GlobalParams
 };
 
 layout(location = 0) out vec4 oColor;
+layout(location = 1) out vec4 diffuseColor;
+layout(location = 2) out vec4 normalColor;
 
 void main()
 {
@@ -136,7 +170,8 @@ void main()
     }
 
     oColor = vec4(finalColor, 1.0);
-    //oColor = texture(uTexture, vTexCoord) * vec4(finalColor, 1.0);
+    diffuseColor = vec4(textureColor, 1.0);
+    normalColor = vec4(vNormal * 0.5f + 0.5f, 1.0);
 }
 
 #endif
