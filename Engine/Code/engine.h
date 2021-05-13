@@ -158,10 +158,11 @@ enum Mode
 
 enum RenderTarget
 {
-    RT_Final,
+    RT_Position,
     RT_Diffuse,
     RT_Normals,
-    RT_Depth
+    RT_Depth,
+    RT_Final
 };
 
 struct App
@@ -194,6 +195,8 @@ struct App
     u32 texturedGeometryProgramIdx;
     u32 texturedQuadProgramIdx;
     u32 depthProgramIdx;
+    u32 gProgramIdx;
+    u32 deferredProgramIdx;
     
     // texture indices
     u32 diceTexIdx;
@@ -211,7 +214,7 @@ struct App
 
     // Mode
     Mode mode;
-    RenderTarget renderTarget = RenderTarget::RT_Final;
+    RenderTarget renderTarget = RenderTarget::RT_Position;
 
     // Embedded geometry (in-editor simple meshes such as
     // a screen filling quad, a cube, a sphere...)
@@ -222,6 +225,11 @@ struct App
     GLuint programUniformTexture;
     GLuint quadProgramUniformTexture;
     GLuint depthProgramUniformTexture;
+    GLuint gProgramUniformTexture;
+
+    GLuint deferredProgramPositionTexture;
+    GLuint deferredProgramNormalTexture;
+    GLuint deferredProgramDifusseTexture;
 
     // Uniform buffer
     Buffer cbuffer;
@@ -234,11 +242,10 @@ struct App
     GLuint vao;
 
     //Framebuffer object stuff
-    GLuint finalAttachmentHandle;
+    GLuint positionAttachmentHandle;
     GLuint diffuseAttachmentHandle;
     GLuint normalsAttachmentHandle;
     GLuint depthAttachmentHandle;
-
     GLuint framebufferHandle;
 };
 
