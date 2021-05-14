@@ -134,6 +134,7 @@ struct Entity
 {
     glm::mat4 worldMatrix;
     u32       modelIndex;
+    bool      render = true;
     u32       localParamsOffset;
     u32       localParamsSize;
 };
@@ -142,7 +143,7 @@ struct Camera
 {
     vec3 position = {0, 0, -10};
     vec3 rotationEuler = { 0, 0, 0 };
-    vec3 target = { 0, 0, 0 };
+    vec3 target = { 0, 0, 0.0 };
     float vfov = 60.0f;
     float nearPlane = 0.1f;
     float farPlane = 1000.0f;
@@ -196,7 +197,8 @@ struct App
     u32 texturedQuadProgramIdx;
     u32 depthProgramIdx;
     u32 gProgramIdx;
-    u32 deferredProgramIdx;
+    u32 deferredDirectionalProgramIdx;
+    u32 deferredPointProgramIdx;
     
     // texture indices
     u32 diceTexIdx;
@@ -226,10 +228,6 @@ struct App
     GLuint quadProgramUniformTexture;
     GLuint depthProgramUniformTexture;
     GLuint gProgramUniformTexture;
-
-    GLuint deferredProgramPositionTexture;
-    GLuint deferredProgramNormalTexture;
-    GLuint deferredProgramDifusseTexture;
 
     // Uniform buffer
     Buffer cbuffer;

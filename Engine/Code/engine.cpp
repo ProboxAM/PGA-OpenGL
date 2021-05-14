@@ -15,6 +15,13 @@
 
 #define BINDING(b) b
 
+void PositionRender(App* app);
+void DiffuseRender(App* app);
+void NormalRender(App* app);
+void DepthRender(App* app);
+void FinalRender(App* app);
+float CalcPointLightRadius(const Light& Light);
+
 GLuint CreateProgramFromSource(String programSource, const char* shaderName)
 {
     GLchar  infoLogBuffer[1024] = {};
@@ -302,9 +309,6 @@ void Init(App* app)
     }
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     // TODO: Initialize your resources here!
     // - vertex buffers
     // - element/index buffers
@@ -325,39 +329,54 @@ void Init(App* app)
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
 
     //Camera
-    app->camera.position = { -3, 5, -15 };
-
-    //Create entities
-    app->entities.push_back(Entity{ TransformPositionScale({5, 0, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0, 0, 3}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({-5, 0, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0, -5, 0}, {100.0, 1.0, 100.0}), app->quadIdx}); //Floor
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 88, { 1, 0, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0, 0, 0}, {1.0, 1.0, 1.0}), app->sphereIdx}); //Sphere
+    app->camera.position = { -8, 8, -17 };
 
     //Create lights
-    app->lights.push_back(Light{ LightType_Directional, {1.0, 1.0, 1.0}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} });
-    //app->lights.push_back(Light{ LightType_Point, {1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0} });
-    //app->lights.push_back(Light{ LightType_Point, {1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0, 0.0, 0.0} });
-    //app->lights.push_back(Light{ LightType_Point, {1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {5.0, 0.0, -2.5} });
+    app->lights.push_back(Light{ LightType_Directional, {0.4, 0.4, 0.4}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} });
+    //app->lights.push_back(Light{ LightType_Point, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0} });
+    //app->lights.push_back(Light{ LightType_Point, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {0, 0.0, 0.0} });
+    Light pLight = { LightType_Point, {1.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 5.0, 0.0} };
+    app->lights.push_back(pLight);
+
+    //Create entities
+    app->entities.push_back(Entity{ TransformPositionScale({5, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({0, 3, 3}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({-5, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx }); //Floor
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 88, { 1, 0, 0 });
+
+    float r = CalcPointLightRadius(pLight);
+    app->entities.push_back(Entity{ TransformPositionScale(pLight.position, {r,r,r}), app->sphereIdx, false}); //Sphere
 
     //Program
     app->texturedGeometryProgramIdx = InitProgram(app, "shaders.glsl", "SHOW_TEXTURED_MESH");
     app->texturedQuadProgramIdx = InitProgram(app, "shaders.glsl", "TEXTURED_GEOMETRY");
     app->depthProgramIdx = InitProgram(app, "shaders.glsl", "TEXTURED_DEPTH");
     app->gProgramIdx = InitProgram(app, "shaders.glsl", "G_BUFFER_SHADER");
-    app->deferredProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_LIGHTING_PASS");
+    app->deferredDirectionalProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_DIRECTIONAL_LIGHTING_PASS");
+    app->deferredPointProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_POINT_LIGHTING_PASS");
 
+    ////////////////////////////////
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
     app->quadProgramUniformTexture = glGetUniformLocation(app->programs[app->texturedQuadProgramIdx].handle, "uTexture");
     app->depthProgramUniformTexture = glGetUniformLocation(app->programs[app->depthProgramIdx].handle, "uTexture");
     app->gProgramUniformTexture = glGetUniformLocation(app->programs[app->gProgramIdx].handle, "uTexture");
-    app->deferredProgramPositionTexture = glGetUniformLocation(app->programs[app->deferredProgramIdx].handle, "gPosition");
-    app->deferredProgramNormalTexture = glGetUniformLocation(app->programs[app->deferredProgramIdx].handle, "gNormal");
-    app->deferredProgramDifusseTexture = glGetUniformLocation(app->programs[app->deferredProgramIdx].handle, "gDiffuse");
+
+
+    glUseProgram(app->programs[app->deferredDirectionalProgramIdx].handle);
+    glUniform1i(glGetUniformLocation(app->programs[app->deferredDirectionalProgramIdx].handle, "gPosition"), 0);
+    glUniform1i(glGetUniformLocation(app->programs[app->deferredDirectionalProgramIdx].handle, "gNormal"), 1);
+    glUniform1i(glGetUniformLocation(app->programs[app->deferredDirectionalProgramIdx].handle, "gDiffuse"), 2);
+
+    glUseProgram(app->programs[app->deferredPointProgramIdx].handle);
+    glUniform1i(glGetUniformLocation(app->programs[app->deferredPointProgramIdx].handle, "gPosition"), 0);
+    glUniform1i(glGetUniformLocation(app->programs[app->deferredPointProgramIdx].handle, "gNormal"), 1);
+    glUniform1i(glGetUniformLocation(app->programs[app->deferredPointProgramIdx].handle, "gDiffuse"), 2);
+
+    glUseProgram(0);
 
     //Create render targets
     CreateFrameBufferObjects(app);
@@ -437,7 +456,10 @@ void Update(App* app)
 
 void Render(App* app)
 {
+    glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+
     switch (app->mode)
     {
         case Mode_TexturedQuad:
@@ -458,7 +480,7 @@ void Render(App* app)
                 // - bind the vao
                 // - glDrawElements() !!!
 
-                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 glViewport(0, 0, app->displaySize.x, app->displaySize.y);
@@ -470,6 +492,9 @@ void Render(App* app)
 
                 for(const Entity &entity : app->entities)
                 {
+                    if (!entity.render)
+                        break;
+
                     Model& model = app->models[entity.modelIndex];
                     Mesh& mesh = app->meshes[model.meshIdx];
 
@@ -499,97 +524,36 @@ void Render(App* app)
     }
 
     //QUAD RENDERING
+    glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
-
-    Mesh& mesh = app->meshes[app->quadIdx];
 
     switch (app->renderTarget)
     {
         case RenderTarget::RT_Position:
         {
-            Program& program = app->programs[app->texturedQuadProgramIdx];
-            glUseProgram(program.handle);
-
-            GLuint vao = FindVAO(mesh, 0, program);
-            glBindVertexArray(vao);
-
-            glUniform1i(app->quadProgramUniformTexture, 0);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
-
+            PositionRender(app);
         }break;
         case RenderTarget::RT_Diffuse: 
         {
-            Program& program = app->programs[app->texturedQuadProgramIdx];
-            glUseProgram(program.handle);
-
-            GLuint vao = FindVAO(mesh, 0, program);
-            glBindVertexArray(vao);
-
-            glUniform1i(app->quadProgramUniformTexture, 0);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
-
+            DiffuseRender(app);
         }break;
         case RenderTarget::RT_Depth:
         {
-            Program& program = app->programs[app->depthProgramIdx];
-            glUseProgram(program.handle);
-
-            GLuint vao = FindVAO(mesh, 0, program);
-            glBindVertexArray(vao);
-
-            glUniform1i(app->depthProgramUniformTexture, 0);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
-
+            DepthRender(app);
         }break;
         case RenderTarget::RT_Normals:
         {
-            Program& program = app->programs[app->texturedQuadProgramIdx];
-            glUseProgram(program.handle);
-
-            GLuint vao = FindVAO(mesh, 0, program);
-            glBindVertexArray(vao);
-
-            glUniform1i(app->quadProgramUniformTexture, 0);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
+            NormalRender(app);
         }break;
         case RenderTarget::RT_Final:
         {
-            Program& program = app->programs[app->deferredProgramIdx];
-            glUseProgram(program.handle);
-
-            glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
-
-            GLuint vao = FindVAO(mesh, 0, program);
-            glBindVertexArray(vao);
-
-            glUniform1i(app->deferredProgramPositionTexture, 0);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
-
-            glUniform1i(app->deferredProgramNormalTexture, 1);
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
-
-            glUniform1i(app->deferredProgramDifusseTexture, 2);
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
+            FinalRender(app);          
         }break;
     }
-
-    Submesh& submesh = mesh.submeshes[0];
-    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
-
-    glBindVertexArray(0);
-    glUseProgram(0);
 }
 
 void OnGlError(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParan) {
@@ -639,34 +603,25 @@ void CreateFrameBufferObjects(App* app)
     //Position render target
     glGenTextures(1, &app->positionAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     //Diffuse render target
     glGenTextures(1, &app->diffuseAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     //Normals render target
     glGenTextures(1, &app->normalsAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     //Depth render target              
@@ -675,9 +630,6 @@ void CreateFrameBufferObjects(App* app)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, app->displaySize.x, app->displaySize.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     //frame buffer creation and render target attachments
@@ -709,3 +661,152 @@ void CreateFrameBufferObjects(App* app)
 
 }
 
+void PositionRender(App* app)
+{
+    Program& program = app->programs[app->texturedQuadProgramIdx];
+    glUseProgram(program.handle);
+
+    Mesh& mesh = app->meshes[app->quadIdx];
+    GLuint vao = FindVAO(mesh, 0, program);
+    glBindVertexArray(vao);
+
+    glUniform1i(app->quadProgramUniformTexture, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
+
+    Submesh& submesh = mesh.submeshes[0];
+    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+void DiffuseRender(App* app)
+{
+    Program& program = app->programs[app->texturedQuadProgramIdx];
+    glUseProgram(program.handle);
+
+    Mesh& mesh = app->meshes[app->quadIdx];
+    GLuint vao = FindVAO(mesh, 0, program);
+    glBindVertexArray(vao);
+
+    glUniform1i(app->quadProgramUniformTexture, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
+
+    Submesh& submesh = mesh.submeshes[0];
+    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+void DepthRender(App* app)
+{
+    Program& program = app->programs[app->depthProgramIdx];
+    glUseProgram(program.handle);
+
+    Mesh& mesh = app->meshes[app->quadIdx];
+    GLuint vao = FindVAO(mesh, 0, program);
+    glBindVertexArray(vao);
+
+    glUniform1i(app->depthProgramUniformTexture, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
+
+    Submesh& submesh = mesh.submeshes[0];
+    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+void NormalRender(App* app)
+{
+    Program& program = app->programs[app->texturedQuadProgramIdx];
+    glUseProgram(program.handle);
+
+    Mesh& mesh = app->meshes[app->quadIdx];
+    GLuint vao = FindVAO(mesh, 0, program);
+    glBindVertexArray(vao);
+
+    glUniform1i(app->quadProgramUniformTexture, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
+
+    Submesh& submesh = mesh.submeshes[0];
+    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+void FinalRender(App* app)
+{
+    glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_ONE, GL_ONE);
+
+    ////////////////////////////////////////////////Point pass
+    glUseProgram(app->programs[app->deferredPointProgramIdx].handle);
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
+
+    Mesh point_mesh = app->meshes[app->models[app->entities.back().modelIndex].meshIdx];
+    GLuint pointVao = FindVAO(point_mesh, 0, app->programs[app->deferredPointProgramIdx]);
+    glBindVertexArray(pointVao);
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, app->entities.back().localParamsOffset, app->entities.back().localParamsSize);
+    glUniform2f(glGetUniformLocation(app->programs[app->deferredPointProgramIdx].handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
+
+    Submesh point_submesh = point_mesh.submeshes[0];
+    glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+
+    /////////////////////////////////////////Directional pass
+    Program& program = app->programs[app->deferredDirectionalProgramIdx];
+    glUseProgram(program.handle);
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
+
+    Mesh& mesh = app->meshes[app->quadIdx];
+    GLuint vao = FindVAO(mesh, 0, program);
+    glBindVertexArray(vao);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
+
+    Submesh& submesh = mesh.submeshes[0];
+    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+float CalcPointLightRadius(const Light& Light)
+{
+    float constant = 1.0;
+    float linear = 0.045;
+    float quadratic = 0.0075;
+    float lightMax = std::fmaxf(std::fmaxf(Light.color.r, Light.color.g), Light.color.b);
+    float radius = (-linear + std::sqrtf(linear * linear - 4.0 * quadratic * (constant - (256.0 / 5.0) * lightMax))) / (2.0 * quadratic);
+    
+    return radius;
+}
