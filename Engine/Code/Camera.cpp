@@ -20,25 +20,30 @@ Camera::Camera(float posX, float posY, float posZ, float upX, float upY, float u
 
 glm::mat4 Camera::GetViewMatrix()
 {
-    return glm::lookAt(Position, Position + Front, Up);
+    if(orbit)
+        return glm::lookAt(Position, Target, WorldUp);
+    else
+        return glm::lookAt(Position, Position + Front, Up);
 }
 
 void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
 {
+    float velocity = MovementSpeed * deltaTime;
+    if (direction == Camera_Movement::FORWARD)
+        Position += Front * velocity;
+    if (direction == Camera_Movement::BACKWARD)
+        Position -= Front * velocity;
+    if (direction == Camera_Movement::LEFT)
+        Position -= Right * velocity;
+    if (direction == Camera_Movement::RIGHT)
+        Position += Right * velocity;
+    if (direction == Camera_Movement::UP)
+        Position += Up * velocity;
+}
 
-    {
-        float velocity = MovementSpeed * deltaTime;
-        if (direction == Camera_Movement::FORWARD)
-            Position += Front * velocity;
-        if (direction == Camera_Movement::BACKWARD)
-            Position -= Front * velocity;
-        if (direction == Camera_Movement::LEFT)
-            Position -= Right * velocity;
-        if (direction == Camera_Movement::RIGHT)
-            Position += Right * velocity;
-        if (direction == Camera_Movement::UP)
-            Position += Up * velocity;
-    }
+void Camera::ProcessOrbit(bool orbit)
+{
+    this->orbit = orbit;
 }
 
 void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch)
