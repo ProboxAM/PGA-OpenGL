@@ -199,6 +199,7 @@ struct App
     u32 gProgramIdx;
     u32 deferredDirectionalProgramIdx;
     u32 deferredPointProgramIdx;
+    u32 pointLightDrawProgramIdx;
     
     // texture indices
     u32 diceTexIdx;

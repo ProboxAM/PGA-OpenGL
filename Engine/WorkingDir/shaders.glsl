@@ -355,18 +355,13 @@ struct Light
 #if defined(VERTEX) ///////////////////////////////////////////////////
 
 layout(location = 0) in vec3 aPosition;
+uniform mat4 uWorldViewProjectionMatrix;
 
 layout(binding = 0, std140) uniform GlobalParams
 {
     vec3 uCameraPosition;
     uint uLightCount;
     Light uLight[16];
-};
-
-layout(binding = 1, std140) uniform LocalParams
-{
-    mat4 uWorldMatrix;
-    mat4 uWorldViewProjectionMatrix;
 };
 
 void main()
@@ -423,6 +418,36 @@ void main()
     }
 
     oColor = vec4(finalColor, 1.0);
+} 
+
+#endif
+#endif
+
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+#ifdef POINT_LIGHT_DEBUG
+
+#if defined(VERTEX) ///////////////////////////////////////////////////
+
+layout(location = 0) in vec3 aPosition;
+
+uniform mat4 uWorldViewProjectionMatrix;
+
+void main()
+{
+    gl_Position = uWorldViewProjectionMatrix * vec4(aPosition, 1.0);
+}
+
+#elif defined(FRAGMENT) ///////////////////////////////////////////////
+
+uniform vec3 lightColor;
+
+out vec4 oColor;
+
+void main()
+{             
+    oColor = vec4(lightColor, 1.0);
 } 
 
 #endif
