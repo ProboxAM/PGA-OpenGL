@@ -328,8 +328,8 @@ void Init(App* app)
     app->sphereIdx = LoadSphere(app);
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
 
-    //Camera
-    app->camera.position = { -8, 8, -17 };
+    // camera
+    Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
 
     //Create lights
     app->lights.push_back(Light{ LightType_Directional, {0.4, 0.4, 0.4}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} });
@@ -412,16 +412,35 @@ void Update(App* app)
 {
     glm::mat4 projection, view;
     // You can handle app->input keyboard/mouse here
+
+    //////////////////////////////////////////KEYBOARD///////////////////////////////////////////
+    if (app->input.keys[K_W] == ButtonState::BUTTON_PRESSED) {
+        app->camera.ProcessKeyboard(Camera_Movement::FORWARD, app->deltaTime);
+    }
+    if (app->input.keys[K_S] == ButtonState::BUTTON_PRESSED) {
+        app->camera.ProcessKeyboard(Camera_Movement::BACKWARD, app->deltaTime);
+    }
+    if (app->input.keys[K_A] == ButtonState::BUTTON_PRESSED) {
+        app->camera.ProcessKeyboard(Camera_Movement::LEFT, app->deltaTime);
+    }
+    if (app->input.keys[K_D] == ButtonState::BUTTON_PRESSED) {
+        app->camera.ProcessKeyboard(Camera_Movement::RIGHT, app->deltaTime);
+    }
+
+    ////////////////////////////////////////////MOUSE/////////////////////////////////////////////
+    app->camera.ProcessMouseMovement(app->input.mouseDelta.x, -app->input.mouseDelta.y);
+
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     vec3 upVector = { 0, 1, 0 };
-    projection = glm::perspective(glm::radians(app->camera.vfov), aspectRatio, app->camera.nearPlane, app->camera.farPlane);
-    view = glm::lookAt(app->camera.position, app->camera.target, upVector);
+    projection = glm::perspective(glm::radians(app->camera.Zoom), aspectRatio, app->camera.NearPlane, app->camera.FarPlane);
+
+    view = app->camera.GetViewMatrix();
 
     MapBuffer(app->cbuffer, GL_WRITE_ONLY);
 
     // -- Global params
     app->globalParamsOffset = app->cbuffer.head;
-    PushVec3(app->cbuffer, app->camera.position);
+    PushVec3(app->cbuffer, app->camera.Position);
     PushUInt(app->cbuffer, app->lights.size());
 
     for (u32 i = 0; i < app->lights.size(); ++i)
@@ -659,6 +678,10 @@ void CreateFrameBufferObjects(App* app)
         
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+}
+
+void HandleInput()
+{
 }
 
 void PositionRender(App* app)
