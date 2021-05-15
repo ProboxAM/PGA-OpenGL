@@ -20,6 +20,9 @@ void DiffuseRender(App* app);
 void NormalRender(App* app);
 void DepthRender(App* app);
 void FinalRender(App* app);
+void PointLightPass(App* app);
+void DirectionalLightPass(App* app);
+void PointLightDraw(App* app);
 float CalcPointLightRadius(const Light& Light);
 
 GLuint CreateProgramFromSource(String programSource, const char* shaderName)
@@ -328,15 +331,11 @@ void Init(App* app)
     app->sphereIdx = LoadSphere(app);
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
 
-    // camera
-    Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
-
     //Create lights
     app->lights.push_back(Light{ LightType_Directional, {0.4, 0.4, 0.4}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} });
-    //app->lights.push_back(Light{ LightType_Point, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0} });
-    //app->lights.push_back(Light{ LightType_Point, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {0, 0.0, 0.0} });
-    Light pLight = { LightType_Point, {1.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 5.0, 0.0} };
-    app->lights.push_back(pLight);
+    app->lights.push_back(Light{ LightType_Point, {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}, {-5.0, 5.0, -5.0} });
+    app->lights.push_back(Light{ LightType_Point, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {5.0, 5.0, -5.0} });
+    app->lights.push_back(Light{ LightType_Point, {1.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 5.0, 0.0} });
 
     //Create entities
     app->entities.push_back(Entity{ TransformPositionScale({5, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
@@ -348,9 +347,6 @@ void Init(App* app)
     app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx }); //Floor
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 88, { 1, 0, 0 });
 
-    float r = CalcPointLightRadius(pLight);
-    app->entities.push_back(Entity{ TransformPositionScale(pLight.position, {r,r,r}), app->sphereIdx, false}); //Sphere
-
     //Program
     app->texturedGeometryProgramIdx = InitProgram(app, "shaders.glsl", "SHOW_TEXTURED_MESH");
     app->texturedQuadProgramIdx = InitProgram(app, "shaders.glsl", "TEXTURED_GEOMETRY");
@@ -358,6 +354,7 @@ void Init(App* app)
     app->gProgramIdx = InitProgram(app, "shaders.glsl", "G_BUFFER_SHADER");
     app->deferredDirectionalProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_DIRECTIONAL_LIGHTING_PASS");
     app->deferredPointProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_POINT_LIGHTING_PASS");
+    app->pointLightDrawProgramIdx = InitProgram(app, "shaders.glsl", "POINT_LIGHT_DEBUG");
 
     ////////////////////////////////
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
@@ -777,38 +774,72 @@ void NormalRender(App* app)
 
 void FinalRender(App* app)
 {
+    //Setting for rendering
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_ONE, GL_ONE);
 
-    ////////////////////////////////////////////////Point pass
+    //Point pass
+    PointLightPass(app);
+
+    //Directional pass
+    DirectionalLightPass(app);
+
+    //Point Light debug draw
+    PointLightDraw(app);
+}
+
+void PointLightPass(App* app)
+{
+    Program& program = app->programs[app->deferredPointProgramIdx];
     glUseProgram(app->programs[app->deferredPointProgramIdx].handle);
 
     glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
 
-    Mesh point_mesh = app->meshes[app->models[app->entities.back().modelIndex].meshIdx];
-    GLuint pointVao = FindVAO(point_mesh, 0, app->programs[app->deferredPointProgramIdx]);
-    glBindVertexArray(pointVao);
+    glm::mat4 projection, view;
+    // You can handle app->input keyboard/mouse here
+    float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
+    vec3 upVector = { 0, 1, 0 };
+    projection = glm::perspective(glm::radians(app->camera.Zoom), aspectRatio, app->camera.NearPlane, app->camera.FarPlane);
+    view = app->camera.GetViewMatrix();
 
-    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, app->entities.back().localParamsOffset, app->entities.back().localParamsSize);
-    glUniform2f(glGetUniformLocation(app->programs[app->deferredPointProgramIdx].handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y);
+    for (const Light& light : app->lights)
+    {
+        if (light.type == 1) //Point Light
+        {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, light.position);
+            model = glm::scale(model, glm::vec3(CalcPointLightRadius(light)));
+            glm::mat4 worldViewProjection = projection * view * model;
+       
+            Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
+            GLuint pointVao = FindVAO(point_mesh, 0, program);
+            glBindVertexArray(pointVao);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
+            glUniformMatrix4fv(glGetUniformLocation(program.handle, "uWorldViewProjectionMatrix"), 1, GL_FALSE, &worldViewProjection[0][0]);
+            glUniform2f(glGetUniformLocation(program.handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y);
+      
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
 
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
 
-    Submesh point_submesh = point_mesh.submeshes[0];
-    glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
+            Submesh point_submesh = point_mesh.submeshes[0];
+            glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
 
-    glBindVertexArray(0);
+            glBindVertexArray(0);
+        }
+    }
     glUseProgram(0);
 
-    /////////////////////////////////////////Directional pass
+}
+
+void DirectionalLightPass(App* app)
+{
     Program& program = app->programs[app->deferredDirectionalProgramIdx];
     glUseProgram(program.handle);
 
@@ -831,6 +862,52 @@ void FinalRender(App* app)
     glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
 
     glBindVertexArray(0);
+    glUseProgram(0);
+}
+
+void PointLightDraw(App* app)
+{
+    glDisable(GL_BLEND);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, app->framebufferHandle);
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+    glBlitFramebuffer(0, 0, app->displaySize.x, app->displaySize.y, 0, 0, app->displaySize.x, app->displaySize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    Program& program = app->programs[app->pointLightDrawProgramIdx];
+    glUseProgram(program.handle);
+
+    glm::mat4 projection, view;
+    // You can handle app->input keyboard/mouse here
+    float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
+    vec3 upVector = { 0, 1, 0 };
+    projection = glm::perspective(glm::radians(app->camera.Zoom), aspectRatio, app->camera.NearPlane, app->camera.FarPlane);
+    view = app->camera.GetViewMatrix();
+
+    for (const Light& light : app->lights)
+    {
+        if (light.type == 1) //Point Light
+        {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, light.position);
+            model = glm::scale(model, glm::vec3(0.25f));
+            glm::mat4 worldViewProjection = projection * view * model;
+
+            glUniform3f(glGetUniformLocation(program.handle, "lightColor"),
+                light.color.r, light.color.g, light.color.b);
+            glUniformMatrix4fv(glGetUniformLocation(program.handle, "uWorldViewProjectionMatrix"), 1, GL_FALSE, &worldViewProjection[0][0]);
+
+            
+            Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
+            GLuint pointVao = FindVAO(point_mesh, 0, app->programs[app->pointLightDrawProgramIdx]);
+            glBindVertexArray(pointVao);
+
+            Submesh point_submesh = point_mesh.submeshes[0];
+            glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
+
+            glBindVertexArray(0);
+        }
+    }
     glUseProgram(0);
 }
 

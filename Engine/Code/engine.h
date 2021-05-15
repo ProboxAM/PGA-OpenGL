@@ -171,7 +171,7 @@ struct App
     char openGlVersion[64];
 
     // Camera
-    Camera camera;
+    Camera camera = Camera({0.0f, 8.0f, -17.0f});
 
     ivec2 displaySize;
 
@@ -190,6 +190,7 @@ struct App
     u32 gProgramIdx;
     u32 deferredDirectionalProgramIdx;
     u32 deferredPointProgramIdx;
+    u32 pointLightDrawProgramIdx;
     
     // texture indices
     u32 diceTexIdx;
