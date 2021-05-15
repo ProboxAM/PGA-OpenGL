@@ -429,15 +429,17 @@ void Update(App* app)
     if (app->input.keys[K_SPACE] == ButtonState::BUTTON_PRESSED) {
         app->camera.ProcessKeyboard(Camera_Movement::UP, app->deltaTime);
     }
-    if (app->input.keys[K_CNTRL] == ButtonState::BUTTON_PRESS) {
-        app->camera.ProcessOrbit(true);
+    if (app->input.keys[K_SHIFT] == ButtonState::BUTTON_PRESS) {
+        app->camera.ProcessSpeed(true);
     }
-    if (app->input.keys[K_CNTRL] == ButtonState::BUTTON_RELEASE) {
-        app->camera.ProcessOrbit(false);
+    if (app->input.keys[K_SHIFT] == ButtonState::BUTTON_RELEASE) {
+        app->camera.ProcessSpeed(false);
     }
 
     ////////////////////////////////////////////MOUSE/////////////////////////////////////////////
-    app->camera.ProcessMouseMovement(app->input.mouseDelta.x, -app->input.mouseDelta.y);
+    if (app->input.mouseButtons[1] == ButtonState::BUTTON_PRESSED) {
+        app->camera.ProcessMouseMovement(app->input.mouseDelta.x, -app->input.mouseDelta.y);
+    }
 
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     vec3 upVector = { 0, 1, 0 };
