@@ -426,6 +426,9 @@ void Update(App* app)
     if (app->input.keys[K_D] == ButtonState::BUTTON_PRESSED) {
         app->camera.ProcessKeyboard(Camera_Movement::RIGHT, app->deltaTime);
     }
+    if (app->input.keys[K_SPACE] == ButtonState::BUTTON_PRESSED) {
+        app->camera.ProcessKeyboard(Camera_Movement::UP, app->deltaTime);
+    }
 
     ////////////////////////////////////////////MOUSE/////////////////////////////////////////////
     app->camera.ProcessMouseMovement(app->input.mouseDelta.x, -app->input.mouseDelta.y);
