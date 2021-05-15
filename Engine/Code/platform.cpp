@@ -65,7 +65,8 @@ void OnGlfwMouseEvent(GLFWwindow* window, int button, int event, int modifiers)
 
 void OnGlfwScrollEvent(GLFWwindow* window, double xoffset, double yoffset)
 {
-    // Nothing do yet... maybe zoom in/out in the future?
+    App* app = (App*)glfwGetWindowUserPointer(window);
+    app->camera.ProcessMouseScroll(yoffset);
 }
 
 void OnGlfwKeyboardEvent(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -76,7 +77,7 @@ void OnGlfwKeyboardEvent(GLFWwindow* window, int key, int scancode, int action, 
         case GLFW_KEY_0: key = K_0; break; case GLFW_KEY_1: key = K_1; break; case GLFW_KEY_2: key = K_2; break;
         case GLFW_KEY_3: key = K_3; break; case GLFW_KEY_4: key = K_4; break; case GLFW_KEY_5: key = K_5; break;
         case GLFW_KEY_6: key = K_6; break; case GLFW_KEY_7: key = K_7; break; case GLFW_KEY_8: key = K_8; break;
-        case GLFW_KEY_9: key = K_9; break;
+        case GLFW_KEY_9: key = K_9; break; case GLFW_KEY_LEFT_CONTROL: key = K_CNTRL; break;
         case GLFW_KEY_A: key = K_A; break; case GLFW_KEY_B: key = K_B; break; case GLFW_KEY_C: key = K_C; break;
         case GLFW_KEY_D: key = K_D; break; case GLFW_KEY_E: key = K_E; break; case GLFW_KEY_F: key = K_F; break;
         case GLFW_KEY_G: key = K_G; break; case GLFW_KEY_H: key = K_H; break; case GLFW_KEY_I: key = K_I; break;
@@ -106,6 +107,46 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
 {
     App* app = (App*)glfwGetWindowUserPointer(window);
     app->displaySize = vec2(width, height);
+
+    glGenTextures(1, &app->positionAttachmentHandle);
+    glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //Diffuse render target
+    glGenTextures(1, &app->diffuseAttachmentHandle);
+    glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //Normals render target
+    glGenTextures(1, &app->normalsAttachmentHandle);
+    glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //Depth render target              
+    glGenTextures(1, &app->depthAttachmentHandle);
+    glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, app->displaySize.x, app->displaySize.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //frame buffer creation and render target attachments
+    glGenFramebuffers(1, &app->framebufferHandle);
+    glBindFramebuffer(GL_FRAMEBUFFER, app->framebufferHandle);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, app->positionAttachmentHandle, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, app->diffuseAttachmentHandle, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, app->normalsAttachmentHandle, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, app->depthAttachmentHandle, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void OnGlfwCloseWindow(GLFWwindow* window)

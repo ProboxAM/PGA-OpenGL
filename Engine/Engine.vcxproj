@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="Code\assimp_model_loading.cpp" />
     <ClCompile Include="Code\buffer_management.cpp" />
+    <ClCompile Include="Code\Camera.cpp" />
     <ClCompile Include="Code\engine.cpp" />
     <ClCompile Include="Code\platform.cpp" />
     <ClCompile Include="Code\Primitives.cpp" />
@@ -37,6 +38,7 @@
   <ItemGroup>
     <ClInclude Include="Code\assimp_model_loading.h" />
     <ClInclude Include="Code\buffer_management.h" />
+    <ClInclude Include="Code\Camera.h" />
     <ClInclude Include="Code\engine.h" />
     <ClInclude Include="Code\platform.h" />
     <ClInclude Include="Code\Primitives.h" />

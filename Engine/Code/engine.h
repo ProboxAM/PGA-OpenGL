@@ -5,6 +5,7 @@
 #pragma once
 
 #include "platform.h"
+#include "Camera.h"
 #include <glad/glad.h>
 
 typedef glm::vec2  vec2;
@@ -139,16 +140,6 @@ struct Entity
     u32       localParamsSize;
 };
 
-struct Camera
-{
-    vec3 position = {0, 0, -10};
-    vec3 rotationEuler = { 0, 0, 0 };
-    vec3 target = { 0, 0, 0.0 };
-    float vfov = 60.0f;
-    float nearPlane = 0.1f;
-    float farPlane = 1000.0f;
-};
-
 enum Mode
 {
     Mode_TexturedQuad,
@@ -180,7 +171,7 @@ struct App
     char openGlVersion[64];
 
     // Camera
-    Camera camera = {};
+    Camera camera = Camera({0.0f, 8.0f, -17.0f});
 
     ivec2 displaySize;
 
