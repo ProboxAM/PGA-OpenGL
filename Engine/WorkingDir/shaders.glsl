@@ -327,7 +327,24 @@ void main()
             //Directional
             float cosAngle = max(dot(Normal, -uLight[i].direction), 0.0); 
             vec3 ambient = 0.1 * uLight[i].color;
-            vec3 diffuse = 0.8 * uLight[i].color * cosAngle;
+            vec3 diffuse = 0.9 * uLight[i].color * cosAngle;
+
+            finalColor += (ambient + diffuse) * Diffuse;
+        }
+
+        if(uLight[i].type == 1)
+        {            
+            //Point          
+            // diffuse
+            vec3 lightDir = normalize(uLight[i].position - Position);
+            vec3 diffuse = 0.9 * max(dot(Normal, lightDir), 0.0) * uLight[i].color;
+            vec3 ambient = 0.1 * uLight[i].color;
+          
+            // attenuation
+            float distance = length(uLight[i].position - Position);
+            float attenuation = 1.0 / (1.0 + 0.14 * distance + 0.07 * (distance * distance));
+            diffuse *= attenuation;
+            ambient *= attenuation;
 
             finalColor += (ambient + diffuse) * Diffuse;
         }
@@ -355,13 +372,10 @@ struct Light
 #if defined(VERTEX) ///////////////////////////////////////////////////
 
 layout(location = 0) in vec3 aPosition;
-uniform mat4 uWorldViewProjectionMatrix;
 
-layout(binding = 0, std140) uniform GlobalParams
+layout(binding = 1, std140) uniform LocalParams
 {
-    vec3 uCameraPosition;
-    uint uLightCount;
-    Light uLight[16];
+    mat4 uWorldViewProjectionMatrix;
 };
 
 void main()
@@ -396,7 +410,7 @@ void main()
     vec3 Diffuse = texture(gDiffuse, vTexCoord).rgb;
     
     // then calculate lighting as usual
-    vec3 finalColor;
+    vec3 finalColor = vec3(0);
 
     //TODO: Sum all lights
     for(uint i = 0; i < uLightCount; ++i)
@@ -406,11 +420,12 @@ void main()
             //Point          
             // diffuse
             vec3 lightDir = normalize(uLight[i].position - Position);
-            vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Diffuse * uLight[i].color;
+            vec3 diffuse = 0.9 * max(dot(Normal, lightDir), 0.0) * Diffuse * uLight[i].color;
+            vec3 ambient = 0.1 * Diffuse;
           
             // attenuation
             float distance = length(uLight[i].position - Position);
-            float attenuation = 1.0 / (1.0 + 0.045 * distance + 0.0075 * (distance * distance));
+            float attenuation = 1.0 / (1.0 + 0.14 * distance + 0.07 * (distance * distance));
             diffuse *= attenuation;
 
             finalColor += diffuse;
@@ -432,7 +447,10 @@ void main()
 
 layout(location = 0) in vec3 aPosition;
 
-uniform mat4 uWorldViewProjectionMatrix;
+layout(binding = 1, std140) uniform LocalParams
+{
+    mat4 uWorldViewProjectionMatrix;
+};
 
 void main()
 {

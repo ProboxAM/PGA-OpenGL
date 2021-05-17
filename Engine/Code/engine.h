@@ -113,6 +113,9 @@ struct Light
     vec3 color; 
     vec3 direction;
     vec3 position;
+
+    u32       localParamsOffset;
+    u32       localParamsSize;
 };
 
 struct Mesh
@@ -171,7 +174,7 @@ struct App
     char openGlVersion[64];
 
     // Camera
-    Camera camera = Camera({0.0f, 8.0f, -17.0f});
+    Camera camera = Camera({0.0f, 8.0f, -45.0f});
 
     ivec2 displaySize;
 
@@ -208,7 +211,7 @@ struct App
 
     // Mode
     Mode mode;
-    RenderTarget renderTarget = RenderTarget::RT_Position;
+    RenderTarget renderTarget = RenderTarget::RT_Final;
 
     // Embedded geometry (in-editor simple meshes such as
     // a screen filling quad, a cube, a sphere...)
@@ -222,7 +225,7 @@ struct App
     GLuint gProgramUniformTexture;
 
     // Uniform buffer
-    Buffer cbuffer;
+    Buffer cbuffer, lightsBuffer;
     GLint maxUniformBufferSize, uniformBufferAlignment;
 
     GLuint globalParamsOffset; //offset for global params in uniform buffer
@@ -236,6 +239,7 @@ struct App
     GLuint diffuseAttachmentHandle;
     GLuint normalsAttachmentHandle;
     GLuint depthAttachmentHandle;
+
     GLuint framebufferHandle;
 };
 

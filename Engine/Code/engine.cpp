@@ -332,18 +332,46 @@ void Init(App* app)
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
 
     //Create lights
-    app->lights.push_back(Light{ LightType_Directional, {0.4, 0.4, 0.4}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} });
-    app->lights.push_back(Light{ LightType_Point, {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}, {-5.0, 5.0, -5.0} });
-    app->lights.push_back(Light{ LightType_Point, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {5.0, 5.0, -5.0} });
-    app->lights.push_back(Light{ LightType_Point, {1.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 5.0, 0.0} });
+    app->lights.push_back(Light{ LightType_Directional, {0.25, 0.25, 0.25}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} }); //side directional
+    app->lights.push_back(Light{ LightType_Directional, {0.35, 0.35, 0.35}, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0} }); //frontal directional
+    const unsigned int NR_LIGHTS = 14;
+    srand(app->deltaTime);
+    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    {
+        // calculate slightly random offsets
+        float xPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
+        float yPos = ((rand() % 100) / 100.0) * 3.0;
+        float zPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
+        vec3 lightPosition = glm::vec3(xPos, yPos, zPos);
+        // also calculate random color
+        float rColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+        float gColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+        float bColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+        vec3 lightColor = glm::vec3(rColor, gColor, bColor);
+
+        app->lights.push_back(Light{ LightType_Point, lightColor, {0.0, 0.0, 0.0}, lightPosition });
+    }
 
     //Create entities
-    app->entities.push_back(Entity{ TransformPositionScale({5, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.push_back(Entity{ TransformPositionScale({10, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0, 3, 3}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.push_back(Entity{ TransformPositionScale({0, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({-5, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({10, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({0, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({-10, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({0, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    
     app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx }); //Floor
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 88, { 1, 0, 0 });
 
@@ -383,26 +411,25 @@ void Init(App* app)
     glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &app->uniformBufferAlignment);
 
     app->cbuffer = CreateConstantBuffer(app->maxUniformBufferSize);
+    app->lightsBuffer = CreateConstantBuffer(app->maxUniformBufferSize);
 
     app->mode = Mode_TexturedQuad;
 }
 
 void Gui(App* app)
 {
-    ImGui::Begin("Info");
-
+    ImGui::BeginMainMenuBar();
     {
-        static const char* selections[]{"Position", "Diffuse", "Normals", "Depth", "Final"};
-        static int selectedTarget = 0;
+        static const char* selections[]{ "Position", "Diffuse", "Normals", "Depth", "Final" };
+        static int selectedTarget = app->renderTarget;
 
         if (ImGui::Combo("RenderTarget", &selectedTarget, selections, ARRAY_COUNT(selections)))
         {
             app->renderTarget = (RenderTarget)selectedTarget;
         }
     }
-
     ImGui::Text("FPS: %f", 1.0f/app->deltaTime);
-    ImGui::End();
+    ImGui::EndMainMenuBar();
 }
 
 void Update(App* app)
@@ -438,6 +465,7 @@ void Update(App* app)
         app->camera.ProcessMouseMovement(app->input.mouseDelta.x, -app->input.mouseDelta.y);
     }
 
+    //GLOBAL AND LOCAL CBUFFER
     float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
     vec3 upVector = { 0, 1, 0 };
     projection = glm::perspective(glm::radians(app->camera.Zoom), aspectRatio, app->camera.NearPlane, app->camera.FarPlane);
@@ -478,13 +506,33 @@ void Update(App* app)
     }
 
     UnmapBuffer(app->cbuffer);
+
+    MapBuffer(app->lightsBuffer, GL_WRITE_ONLY);
+    // -- Light params
+    for (Light& light : app->lights)
+    {
+        if (light.type != LightType_Point) //Point Light
+            continue;
+
+        AlignHead(app->lightsBuffer, app->uniformBufferAlignment);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, light.position);
+        //model = glm::scale(model, glm::vec3(CalcPointLightRadius(light))); this is for sphere light volume, makes sphere size same as radius of light
+        model = glm::scale(model, glm::vec3(0.25f)); //small size for forward rendering sphere
+        glm::mat4 worldViewProjection = projection * view * model;
+
+        light.localParamsOffset = app->lightsBuffer.head;
+        PushMat4(app->lightsBuffer, worldViewProjection);
+        light.localParamsSize = app->lightsBuffer.head - light.localParamsOffset;
+    }
+
+    UnmapBuffer(app->lightsBuffer);
 }
 
 
 void Render(App* app)
 {
     glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
 
     switch (app->mode)
@@ -552,9 +600,13 @@ void Render(App* app)
 
     //QUAD RENDERING
     glDepthMask(GL_FALSE);
-    glDisable(GL_DEPTH_TEST);
-
+    
+    //Add depth from gBuffer to the default fbo
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, app->framebufferHandle);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+    glBlitFramebuffer(0, 0, app->displaySize.x, app->displaySize.y, 0, 0, app->displaySize.x, app->displaySize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
@@ -774,15 +826,13 @@ void NormalRender(App* app)
 
 void FinalRender(App* app)
 {
-    //Setting for rendering
     glEnable(GL_BLEND);
-    glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_ONE, GL_ONE);
 
-    //Point pass
-    PointLightPass(app);
+    //Point pass using sphere light volume, not working currently because of depth of volume issues
+    //PointLightPass(app);
 
-    //Directional pass
+    //Directional pass + point light both using a quad, because couldn't make sphere volume work properly
     DirectionalLightPass(app);
 
     //Point Light debug draw
@@ -791,32 +841,26 @@ void FinalRender(App* app)
 
 void PointLightPass(App* app)
 {
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+
+    //Render Point Lights into a Sphere Light Volume using the gBuffer textures
     Program& program = app->programs[app->deferredPointProgramIdx];
     glUseProgram(app->programs[app->deferredPointProgramIdx].handle);
 
     glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
 
-    glm::mat4 projection, view;
-    // You can handle app->input keyboard/mouse here
-    float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
-    vec3 upVector = { 0, 1, 0 };
-    projection = glm::perspective(glm::radians(app->camera.Zoom), aspectRatio, app->camera.NearPlane, app->camera.FarPlane);
-    view = app->camera.GetViewMatrix();
+    Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
+    Submesh point_submesh = point_mesh.submeshes[0];
 
     for (const Light& light : app->lights)
     {
-        if (light.type == 1) //Point Light
-        {
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, light.position);
-            model = glm::scale(model, glm::vec3(CalcPointLightRadius(light)));
-            glm::mat4 worldViewProjection = projection * view * model;
-       
-            Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
+        if (light.type == LightType_Point) //Point Light
+        {     
             GLuint pointVao = FindVAO(point_mesh, 0, program);
             glBindVertexArray(pointVao);
 
-            glUniformMatrix4fv(glGetUniformLocation(program.handle, "uWorldViewProjectionMatrix"), 1, GL_FALSE, &worldViewProjection[0][0]);
+            glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->lightsBuffer.handle, light.localParamsOffset, light.localParamsSize);
             glUniform2f(glGetUniformLocation(program.handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y);
       
             glActiveTexture(GL_TEXTURE0);
@@ -828,18 +872,18 @@ void PointLightPass(App* app)
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
 
-            Submesh point_submesh = point_mesh.submeshes[0];
             glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
 
             glBindVertexArray(0);
         }
     }
     glUseProgram(0);
-
+    glDisable(GL_CULL_FACE);
 }
 
 void DirectionalLightPass(App* app)
 {
+    //Render directional light into a quad using gBuffer textures
     Program& program = app->programs[app->deferredDirectionalProgramIdx];
     glUseProgram(program.handle);
 
@@ -867,38 +911,21 @@ void DirectionalLightPass(App* app)
 
 void PointLightDraw(App* app)
 {
+    //Render point lights as a small sphere to show where light is positioned.
     glDisable(GL_BLEND);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, app->framebufferHandle);
-
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
-    glBlitFramebuffer(0, 0, app->displaySize.x, app->displaySize.y, 0, 0, app->displaySize.x, app->displaySize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     Program& program = app->programs[app->pointLightDrawProgramIdx];
     glUseProgram(program.handle);
 
-    glm::mat4 projection, view;
-    // You can handle app->input keyboard/mouse here
-    float aspectRatio = (float)app->displaySize.x / (float)app->displaySize.y;
-    vec3 upVector = { 0, 1, 0 };
-    projection = glm::perspective(glm::radians(app->camera.Zoom), aspectRatio, app->camera.NearPlane, app->camera.FarPlane);
-    view = app->camera.GetViewMatrix();
-
+    Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
     for (const Light& light : app->lights)
     {
         if (light.type == 1) //Point Light
         {
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, light.position);
-            model = glm::scale(model, glm::vec3(0.25f));
-            glm::mat4 worldViewProjection = projection * view * model;
-
             glUniform3f(glGetUniformLocation(program.handle, "lightColor"),
                 light.color.r, light.color.g, light.color.b);
-            glUniformMatrix4fv(glGetUniformLocation(program.handle, "uWorldViewProjectionMatrix"), 1, GL_FALSE, &worldViewProjection[0][0]);
-
-            
-            Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
+            glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->lightsBuffer.handle, light.localParamsOffset, light.localParamsSize);
+           
             GLuint pointVao = FindVAO(point_mesh, 0, app->programs[app->pointLightDrawProgramIdx]);
             glBindVertexArray(pointVao);
 
@@ -914,10 +941,13 @@ void PointLightDraw(App* app)
 float CalcPointLightRadius(const Light& Light)
 {
     float constant = 1.0;
-    float linear = 0.045;
-    float quadratic = 0.0075;
+    float linear = 0.14;
+    float quadratic = 0.07;
     float lightMax = std::fmaxf(std::fmaxf(Light.color.r, Light.color.g), Light.color.b);
-    float radius = (-linear + std::sqrtf(linear * linear - 4.0 * quadratic * (constant - (256.0 / 5.0) * lightMax))) / (2.0 * quadratic);
+
+    float radius =
+        (-linear + std::sqrtf(linear * linear - 4.0f * quadratic * (constant - (256.0f / 5.0f) * lightMax)))
+        / (2.0f * quadratic);
     
     return radius;
 }
