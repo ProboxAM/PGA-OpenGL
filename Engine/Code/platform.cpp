@@ -108,6 +108,7 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
     App* app = (App*)glfwGetWindowUserPointer(window);
     app->displaySize = vec2(width, height);
 
+    glDeleteTextures(1, &app->positionAttachmentHandle);
     glGenTextures(1, &app->positionAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -116,6 +117,7 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     //Diffuse render target
+    glDeleteTextures(1, &app->diffuseAttachmentHandle);
     glGenTextures(1, &app->diffuseAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -124,6 +126,7 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     //Normals render target
+    glDeleteTextures(1, &app->normalsAttachmentHandle);
     glGenTextures(1, &app->normalsAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -131,7 +134,8 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    //Depth render target              
+    //Depth render target        
+    glDeleteTextures(1, &app->depthAttachmentHandle);
     glGenTextures(1, &app->depthAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, app->displaySize.x, app->displaySize.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
