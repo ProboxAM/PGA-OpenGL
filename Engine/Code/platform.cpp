@@ -143,8 +143,7 @@ void OnGlfwResizeFramebuffer(GLFWwindow* window, int width, int height)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    //frame buffer creation and render target attachments
-    glGenFramebuffers(1, &app->framebufferHandle);
+    //frame buffer creation and render target attachments   
     glBindFramebuffer(GL_FRAMEBUFFER, app->framebufferHandle);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, app->positionAttachmentHandle, 0);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, app->diffuseAttachmentHandle, 0);
