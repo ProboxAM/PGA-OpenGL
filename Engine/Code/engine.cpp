@@ -517,8 +517,8 @@ void Update(App* app)
         AlignHead(app->lightsBuffer, app->uniformBufferAlignment);
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, light.position);
-        //model = glm::scale(model, glm::vec3(CalcPointLightRadius(light))); this is for sphere light volume, makes sphere size same as radius of light
-        model = glm::scale(model, glm::vec3(0.25f)); //small size for forward rendering sphere
+        model = glm::scale(model, glm::vec3(CalcPointLightRadius(light))); //this is for sphere light volume, makes sphere size same as radius of light
+        //model = glm::scale(model, glm::vec3(0.25f)); //small size for forward rendering sphere
         glm::mat4 worldViewProjection = projection * view * model;
 
         light.localParamsOffset = app->lightsBuffer.head;
@@ -830,13 +830,13 @@ void FinalRender(App* app)
     glBlendFunc(GL_ONE, GL_ONE);
 
     //Point pass using sphere light volume, not working currently because of depth of volume issues
-    //PointLightPass(app);
+    PointLightPass(app);
 
     //Directional pass + point light both using a quad, because couldn't make sphere volume work properly
     DirectionalLightPass(app);
 
     //Point Light debug draw
-    PointLightDraw(app);
+   // PointLightDraw(app);
 }
 
 void PointLightPass(App* app)
@@ -872,12 +872,16 @@ void PointLightPass(App* app)
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
 
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
+
             glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
 
             glBindVertexArray(0);
         }
     }
     glUseProgram(0);
+    glCullFace(GL_BACK);
     glDisable(GL_CULL_FACE);
 }
 

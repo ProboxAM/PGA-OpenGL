@@ -399,6 +399,7 @@ out vec4 oColor;
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gDiffuse;
+uniform sampler2D gDepth;
 
 void main()
 {             
@@ -411,6 +412,7 @@ void main()
     
     // then calculate lighting as usual
     vec3 finalColor = vec3(0);
+    float depth = texture(gDepth, vTexCoord);
 
     //TODO: Sum all lights
     for(uint i = 0; i < uLightCount; ++i)
