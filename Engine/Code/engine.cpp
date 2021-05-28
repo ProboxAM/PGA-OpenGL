@@ -24,6 +24,7 @@ void PointLightPass(App* app);
 void DirectionalLightPass(App* app);
 void PointLightDraw(App* app);
 float CalcPointLightRadius(const Light& Light);
+u32 GenerateCustomMaterial(App* app, u32 base, u32 normal, u32 bump);
 
 GLuint CreateProgramFromSource(String programSource, const char* shaderName)
 {
@@ -325,55 +326,39 @@ void Init(App* app)
     app->blackTexIdx = LoadTexture2D(app, "color_black.png");
     app->normalTexIdx = LoadTexture2D(app, "color_normal.png");
     app->magentaTexIdx = LoadTexture2D(app, "color_magenta.png");
+    app->brickBaseTexIdx = LoadTexture2D(app, "Bricks_Base.jpg");
+    app->brickNormalTexIdx = LoadTexture2D(app, "Bricks_Normal.jpg");
+    app->brickBumpTexIdx = LoadTexture2D(app, "Bricks_Bump.jpg");
 
     //Load Models/Primitives
-    app->quadIdx = LoadQuad(app);
+    app->quadIdx = LoadCube(app);
     app->sphereIdx = LoadSphere(app);
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
+    app->cubeIdx = LoadCube(app);
+    app->models[app->cubeIdx].materialIdx[0] = GenerateCustomMaterial(app, app->brickBaseTexIdx, app->brickNormalTexIdx, app->brickBumpTexIdx);
 
     //Create lights
-    app->lights.push_back(Light{ LightType_Directional, {0.25, 0.25, 0.25}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} }); //side directional
-    app->lights.push_back(Light{ LightType_Directional, {0.35, 0.35, 0.35}, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0} }); //frontal directional
-    const unsigned int NR_LIGHTS = 14;
-    srand(app->deltaTime);
-    for (unsigned int i = 0; i < NR_LIGHTS; i++)
-    {
-        // calculate slightly random offsets
-        float xPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
-        float yPos = ((rand() % 100) / 100.0) * 3.0;
-        float zPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
-        vec3 lightPosition = glm::vec3(xPos, yPos, zPos);
-        // also calculate random color
-        float rColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
-        float gColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
-        float bColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
-        vec3 lightColor = glm::vec3(rColor, gColor, bColor);
+    //app->lights.push_back(Light{ LightType_Directional, {1.0, 1.0, 1.0}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} }); //side directional
+    //app->lights.push_back(Light{ LightType_Directional, {0.35, 0.35, 0.35}, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0} }); //frontal directional
+    //const unsigned int NR_LIGHTS = 14;
+    //srand(app->deltaTime);
+    //for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    //{
+    //    // calculate slightly random offsets
+    //    float xPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
+    //    float yPos = ((rand() % 100) / 100.0) * 3.0;
+    //    float zPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
+    //    vec3 lightPosition = glm::vec3(xPos, yPos, zPos);
+    //    // also calculate random color
+    //    float rColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+    //    float gColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+    //    float bColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+    //    vec3 lightColor = glm::vec3(rColor, gColor, bColor);
 
-        app->lights.push_back(Light{ LightType_Point, lightColor, {0.0, 0.0, 0.0}, lightPosition });
-    }
+    //    app->lights.push_back(Light{ LightType_Point, lightColor, {0.0, 0.0, 0.0}, lightPosition });
+    //}
 
-    //Create entities
-    app->entities.push_back(Entity{ TransformPositionScale({10, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({10, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({-10, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    
-    app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx }); //Floor
-    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 88, { 1, 0, 0 });
+    app->lights.push_back(Light{ LightType_Point, {1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 2.0, -1.0} });
 
     //Program
     app->texturedGeometryProgramIdx = InitProgram(app, "shaders.glsl", "SHOW_TEXTURED_MESH");
@@ -383,6 +368,7 @@ void Init(App* app)
     app->deferredDirectionalProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_DIRECTIONAL_LIGHTING_PASS");
     app->deferredPointProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_POINT_LIGHTING_PASS");
     app->pointLightDrawProgramIdx = InitProgram(app, "shaders.glsl", "POINT_LIGHT_DEBUG");
+    app->gProgramNormalMappingIdx = InitProgram(app, "shaders.glsl", "G_BUFFER_NORMAL_MAPPING");
 
     ////////////////////////////////
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
@@ -412,6 +398,31 @@ void Init(App* app)
 
     app->cbuffer = CreateConstantBuffer(app->maxUniformBufferSize);
     app->lightsBuffer = CreateConstantBuffer(app->maxUniformBufferSize);
+
+    //Create entities
+    //app->entities.push_back(Entity{ TransformPositionScale({10, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({0, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 0}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({10, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({0, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({-10, 3, -10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({0, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    //app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
+    //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+    app->entities.push_back(Entity{ TransformPositionScale({0.0, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramNormalMappingIdx }); //Cube
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+
+    app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx, app->gProgramIdx }); //Floor
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, -90, { 1, 0, 0 });
 
     app->mode = Mode_TexturedQuad;
 }
@@ -497,10 +508,12 @@ void Update(App* app)
     {
         AlignHead(app->cbuffer, app->uniformBufferAlignment);
         glm::mat4 world = e.worldMatrix;
+        glm::mat4 worldView = view * world;
         glm::mat4 worldViewProjection = projection * view * world;
 
         e.localParamsOffset = app->cbuffer.head;
         PushMat4(app->cbuffer, world);
+        PushMat4(app->cbuffer, worldView);
         PushMat4(app->cbuffer, worldViewProjection);
         e.localParamsSize = app->cbuffer.head - e.localParamsOffset;
     }
@@ -534,6 +547,7 @@ void Render(App* app)
 {
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
 
     switch (app->mode)
     {
@@ -560,18 +574,16 @@ void Render(App* app)
 
                 glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
-                Program& texturedMeshProgram = app->programs[app->gProgramIdx];
-                glUseProgram(texturedMeshProgram.handle);
-
-                glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
-
                 for(const Entity &entity : app->entities)
                 {
-                    if (!entity.render)
-                        break;
 
                     Model& model = app->models[entity.modelIndex];
                     Mesh& mesh = app->meshes[model.meshIdx];
+
+                    Program& texturedMeshProgram = app->programs[entity.programIdx];
+                    glUseProgram(texturedMeshProgram.handle);
+
+                    //glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
 
                     glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, entity.localParamsOffset, entity.localParamsSize);
 
@@ -583,8 +595,15 @@ void Render(App* app)
                         u32 submeshMaterialIdx = model.materialIdx[i];
                         Material& submeshMaterial = app->materials[submeshMaterialIdx];
                         glUniform1i(app->gProgramUniformTexture, 0);
+
                         glActiveTexture(GL_TEXTURE0);
                         glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+
+                        if (submeshMaterial.normalTextureIdx != 69) {
+                            glUniform1i(glGetUniformLocation(app->gProgramNormalMappingIdx, "uNormalMap"), 1);
+                            glActiveTexture(GL_TEXTURE1);
+                            glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.normalTextureIdx].handle);
+                        }
 
                         Submesh& submesh = mesh.submeshes[i];
                         glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
@@ -954,4 +973,17 @@ float CalcPointLightRadius(const Light& Light)
         / (2.0f * quadratic);
     
     return radius;
+}
+
+u32 GenerateCustomMaterial(App* app, u32 base, u32 normal, u32 bump) {
+    Material myMat;
+    myMat.albedo = vec3(1.0f, 1.0f, 1.0f);
+    myMat.albedoTextureIdx = base;
+    myMat.normalTextureIdx = normal;
+    myMat.bumpTextureIdx = bump;
+
+    u32 materialIdx = app->materials.size();
+    app->materials.push_back(myMat);
+
+    return materialIdx;
 }

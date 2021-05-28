@@ -47,7 +47,7 @@ struct Material
     u32         albedoTextureIdx;
     u32         emissiveTextureIdx;
     u32         specularTextureIdx;
-    u32         normalsTextureIdx;
+    u32         normalTextureIdx = 69;
     u32         bumpTextureIdx;
 };
 
@@ -138,7 +138,7 @@ struct Entity
 {
     glm::mat4 worldMatrix;
     u32       modelIndex;
-    bool      render = true;
+    u32       programIdx;
     u32       localParamsOffset;
     u32       localParamsSize;
 };
@@ -194,6 +194,7 @@ struct App
     u32 deferredDirectionalProgramIdx;
     u32 deferredPointProgramIdx;
     u32 pointLightDrawProgramIdx;
+    u32 gProgramNormalMappingIdx;
     
     // texture indices
     u32 diceTexIdx;
@@ -201,9 +202,13 @@ struct App
     u32 blackTexIdx;
     u32 normalTexIdx;
     u32 magentaTexIdx;
+    u32 brickBaseTexIdx;
+    u32 brickNormalTexIdx;
+    u32 brickBumpTexIdx;
 
     // model index
     u32 patrickIdx;
+    u32 cubeIdx;
 
     // model primitives index
     u32 sphereIdx;

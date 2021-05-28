@@ -132,7 +132,7 @@ void ProcessAssimpMaterial(App* app, aiMaterial *material, Material& myMaterial,
         material->GetTexture(aiTextureType_NORMALS, 0, &aiFilename);
         String filename = MakeString(aiFilename.C_Str());
         String filepath = MakePath(directory, filename);
-        myMaterial.normalsTextureIdx = LoadTexture2D(app, filepath.str);
+        myMaterial.normalTextureIdx = LoadTexture2D(app, filepath.str);
     }
     if (material->GetTextureCount(aiTextureType_HEIGHT) > 0)
     {

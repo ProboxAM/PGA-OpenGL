@@ -95,6 +95,7 @@ layout(binding = 0, std140) uniform GlobalParams
 layout(binding = 1, std140) uniform LocalParams
 {
     mat4 uWorldMatrix;
+    mat4 uWorldViewMatrix;
     mat4 uWorldViewProjectionMatrix;
 };
 
@@ -208,6 +209,7 @@ layout(binding = 0, std140) uniform GlobalParams
 layout(binding = 1, std140) uniform LocalParams
 {
     mat4 uWorldMatrix;
+    mat4 uWorldViewMatrix;
     mat4 uWorldViewProjectionMatrix;
 };
 
@@ -473,6 +475,158 @@ void main()
 #endif
 #endif
 
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+#ifdef RELIEF_MAPPING
+
+#if defined(VERTEX) ///////////////////////////////////////////////////
+
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec2 aTexCoords;
+layout (location = 3) in vec3 aTangent;
+layout (location = 4) in vec3 aBitangent;
+
+out vec3 FragPos;
+out vec2 TexCoords;
+out vec3 TangentLightPos;
+out vec3 TangentViewPos;
+out vec3 TangentFragPos;
+
+layout(binding = 1, std140) uniform LocalParams
+{
+    mat4 uWorldMatrix;
+    mat4 uWorldViewMatrix;
+    mat4 uWorldViewProjectionMatrix;
+};
+
+uniform vec3 lightPos;
+uniform vec3 viewPos;
+
+void main()
+{
+    gl_Position      = projection * view * model * vec4(aPos, 1.0);
+    vs_out.FragPos   = vec3(model * vec4(aPos, 1.0));   
+    vs_out.TexCoords = aTexCoords;    
+    
+    vec3 T   = normalize(mat3(model) * aTangent);
+    vec3 B   = normalize(mat3(model) * aBitangent);
+    vec3 N   = normalize(mat3(model) * aNormal);
+    mat3 TBN = transpose(mat3(T, B, N));
+
+    vs_out.TangentLightPos = TBN * lightPos;
+    vs_out.TangentViewPos  = TBN * viewPos;
+    vs_out.TangentFragPos  = TBN * vs_out.FragPos;
+}   
+
+#elif defined(FRAGMENT) ///////////////////////////////////////////////
+
+uniform vec3 lightColor;
+
+out vec4 oColor;
+
+void main()
+{             
+    oColor = vec4(lightColor, 1.0);
+} 
+
+#endif
+#endif
+
+#ifdef G_BUFFER_NORMAL_MAPPING
+
+struct Light
+{
+    uint type;
+    vec3 color;
+    vec3 direction;
+    vec3 position;
+};
+
+#if defined(VERTEX) ///////////////////////////////////////////////////
+
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aTextCoord;
+layout(location = 3) in vec3 aTangent;
+layout(location = 4) in vec3 aBitangent;
+
+layout(binding = 1, std140) uniform LocalParams
+{
+    mat4 uWorldMatrix;
+    mat4 uWorldViewMatrix;
+    mat4 uWorldViewProjectionMatrix;
+};
+
+out vec3 vPosition;
+out vec3 vTangentLocalSpace;
+out vec3 vBitangentLocalSpace;
+out vec3 vNormalLocalSpace;
+out vec2 vTexCoord;
+
+void main()
+{
+    vTexCoord = aTextCoord;
+    vPosition = (uWorldMatrix * vec4(aPosition, 1.0)).xyz;
+    vTangentLocalSpace = aTangent;
+    vBitangentLocalSpace = aBitangent;
+    vNormalLocalSpace = aNormal;
+
+    gl_Position = uWorldViewProjectionMatrix * vec4(aPosition, 1.0);
+}
+
+#elif defined(FRAGMENT) ///////////////////////////////////////////////
+
+
+in vec3 vPosition;
+in vec3 vTangentLocalSpace;
+in vec3 vBitangentLocalSpace;
+in vec3 vNormalLocalSpace;
+in vec2 vTexCoord;
+
+
+uniform sampler2D uTexture;
+uniform sampler2D uNormalMap;
+
+layout (location = 0) out vec3 gPosition;
+layout (location = 1) out vec4 gAlbedo;
+layout (location = 2) out vec3 gNormal;
+
+layout(binding = 1, std140) uniform LocalParams
+{
+    mat4 uWorldMatrix;
+    mat4 uWorldViewMatrix;
+    mat4 uWorldViewProjectionMatrix;
+};
+
+void main()
+{    
+    // store the fragment position vector in the first gbuffer texture
+    gPosition = vPosition;
+    // and the diffuse per-fragment color
+    gAlbedo = texture(uTexture, vTexCoord);
+
+    // Tangent to local (TBN) matrix
+    vec3 T = normalize(vTangentLocalSpace);
+    vec3 B = normalize(vBitangentLocalSpace);
+    vec3 N = normalize(vNormalLocalSpace);
+    mat3 TBN = mat3(T, B, N);
+    // Convert normal from tangent space to local space and view space
+    vec3 tangentSpaceNormal = texture(uNormalMap, vTexCoord).xyz * 2.0 - vec3(1.0);
+    vec3 localSpaceNormal = TBN * tangentSpaceNormal;
+    vec3 viewSpaceNormal = normalize(uWorldViewMatrix * vec4(localSpaceNormal, 0.0)).xyz;
+
+    // also store the per-fragment normals into the gbuffer
+    gNormal = viewSpaceNormal;
+} 
+
+#endif
+#endif
+
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
 
 // NOTE: You can write several shaders in the same file if you want as
 // long as you embrace them within an #ifdef block (as you can see above).
