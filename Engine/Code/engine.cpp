@@ -418,7 +418,10 @@ void Init(App* app)
     //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
     //app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
     //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({0.0, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramNormalMappingIdx }); //Cube
+    app->entities.push_back(Entity{ TransformPositionScale({-1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramNormalMappingIdx }); //Cube
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+
+    app->entities.push_back(Entity{ TransformPositionScale({1, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramIdx }); //Cube
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
 
     app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx, app->gProgramIdx }); //Floor
