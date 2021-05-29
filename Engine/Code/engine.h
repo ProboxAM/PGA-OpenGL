@@ -48,7 +48,7 @@ struct Material
     u32         emissiveTextureIdx;
     u32         specularTextureIdx;
     u32         normalTextureIdx = 69;
-    u32         bumpTextureIdx;
+    u32         bumpTextureIdx = 69;
 };
 
 struct VertexV3V2 {
@@ -195,6 +195,7 @@ struct App
     u32 deferredPointProgramIdx;
     u32 pointLightDrawProgramIdx;
     u32 gProgramNormalMappingIdx;
+    u32 reliefMappingIdx;
     
     // texture indices
     u32 diceTexIdx;
@@ -205,10 +206,14 @@ struct App
     u32 brickBaseTexIdx;
     u32 brickNormalTexIdx;
     u32 brickBumpTexIdx;
+    u32 woodBaseTexIdx;
+    u32 woodNormalTexIdx;
+    u32 woodHeightTexIdx;
 
     // model index
     u32 patrickIdx;
     u32 cubeIdx;
+    u32 cubeBumpIdx;
 
     // model primitives index
     u32 sphereIdx;

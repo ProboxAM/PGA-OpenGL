@@ -14,6 +14,7 @@
 #include "buffer_management.h"
 
 #define BINDING(b) b
+#define NO_TEXTURE_ATTACHED 69
 
 void PositionRender(App* app);
 void DiffuseRender(App* app);
@@ -329,13 +330,18 @@ void Init(App* app)
     app->brickBaseTexIdx = LoadTexture2D(app, "Bricks_Base.jpg");
     app->brickNormalTexIdx = LoadTexture2D(app, "Bricks_Normal.jpg");
     app->brickBumpTexIdx = LoadTexture2D(app, "Bricks_Bump.jpg");
+    app->woodBaseTexIdx = LoadTexture2D(app, "Wood_Base.png");
+    app->woodNormalTexIdx = LoadTexture2D(app, "Wood_Normal.png");
+    app->woodHeightTexIdx = LoadTexture2D(app, "Wood_Height.png");
 
     //Load Models/Primitives
     app->quadIdx = LoadCube(app);
     app->sphereIdx = LoadSphere(app);
     app->patrickIdx = LoadModel(app, "Patrick/Patrick.obj");
     app->cubeIdx = LoadCube(app);
-    app->models[app->cubeIdx].materialIdx[0] = GenerateCustomMaterial(app, app->brickBaseTexIdx, app->brickNormalTexIdx, app->brickBumpTexIdx);
+    app->cubeBumpIdx = LoadCube(app);
+    app->models[app->cubeIdx].materialIdx[0] = GenerateCustomMaterial(app, app->woodBaseTexIdx, app->woodNormalTexIdx, NO_TEXTURE_ATTACHED);
+    app->models[app->cubeBumpIdx].materialIdx[0] = GenerateCustomMaterial(app, app->woodBaseTexIdx, app->woodNormalTexIdx, app->woodHeightTexIdx);
 
     //Create lights
     //app->lights.push_back(Light{ LightType_Directional, {1.0, 1.0, 1.0}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} }); //side directional
@@ -368,6 +374,7 @@ void Init(App* app)
     app->deferredDirectionalProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_DIRECTIONAL_LIGHTING_PASS");
     app->deferredPointProgramIdx = InitProgram(app, "shaders.glsl", "DEFERRED_POINT_LIGHTING_PASS");
     app->pointLightDrawProgramIdx = InitProgram(app, "shaders.glsl", "POINT_LIGHT_DEBUG");
+    app->reliefMappingIdx = InitProgram(app, "shaders.glsl", "RELIEF_MAPPING");
     app->gProgramNormalMappingIdx = InitProgram(app, "shaders.glsl", "G_BUFFER_NORMAL_MAPPING");
 
     ////////////////////////////////
@@ -376,6 +383,14 @@ void Init(App* app)
     app->depthProgramUniformTexture = glGetUniformLocation(app->programs[app->depthProgramIdx].handle, "uTexture");
     app->gProgramUniformTexture = glGetUniformLocation(app->programs[app->gProgramIdx].handle, "uTexture");
 
+    glUseProgram(app->programs[app->gProgramNormalMappingIdx].handle);
+    glUniform1i(glGetUniformLocation(app->programs[app->gProgramNormalMappingIdx].handle, "uTexture"), 0);
+    glUniform1i(glGetUniformLocation(app->programs[app->gProgramNormalMappingIdx].handle, "uNormalMap"), 1);
+
+    glUseProgram(app->programs[app->reliefMappingIdx].handle);
+    glUniform1i(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uTexture"), 0);
+    glUniform1i(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uNormalMap"), 1);
+    glUniform1i(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightMap"), 2);
 
     glUseProgram(app->programs[app->deferredDirectionalProgramIdx].handle);
     glUniform1i(glGetUniformLocation(app->programs[app->deferredDirectionalProgramIdx].handle, "gPosition"), 0);
@@ -419,6 +434,9 @@ void Init(App* app)
     //app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
     //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
     app->entities.push_back(Entity{ TransformPositionScale({-1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramNormalMappingIdx }); //Cube
+    app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
+
+    app->entities.push_back(Entity{ TransformPositionScale({-3.0, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeBumpIdx, app->reliefMappingIdx }); //Cube
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
 
     app->entities.push_back(Entity{ TransformPositionScale({1, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramIdx }); //Cube
@@ -472,6 +490,19 @@ void Update(App* app)
     }
     if (app->input.keys[K_SHIFT] == ButtonState::BUTTON_RELEASE) {
         app->camera.ProcessSpeed(false);
+    }
+
+    if (app->input.keys[K_I] == ButtonState::BUTTON_PRESSED) {
+        app->lights[0].position += vec3(0.0, 0.1, 0.0);
+    }
+    if (app->input.keys[K_K] == ButtonState::BUTTON_PRESSED) {
+        app->lights[0].position -= vec3(0.0, 0.1, 0.0);
+    }
+    if (app->input.keys[K_J] == ButtonState::BUTTON_PRESSED) {
+        app->lights[0].position += vec3(0.1, 0.0, 0.0);
+    }
+    if (app->input.keys[K_L] == ButtonState::BUTTON_PRESSED) {
+        app->lights[0].position -= vec3(0.1, 0.0, 0.0);
     }
 
     ////////////////////////////////////////////MOUSE/////////////////////////////////////////////
@@ -597,15 +628,21 @@ void Render(App* app)
 
                         u32 submeshMaterialIdx = model.materialIdx[i];
                         Material& submeshMaterial = app->materials[submeshMaterialIdx];
-                        glUniform1i(app->gProgramUniformTexture, 0);
 
                         glActiveTexture(GL_TEXTURE0);
                         glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
 
-                        if (submeshMaterial.normalTextureIdx != 69) {
-                            glUniform1i(glGetUniformLocation(app->gProgramNormalMappingIdx, "uNormalMap"), 1);
+                        if (submeshMaterial.normalTextureIdx != NO_TEXTURE_ATTACHED) {
                             glActiveTexture(GL_TEXTURE1);
                             glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.normalTextureIdx].handle);
+                        }
+
+                        if (submeshMaterial.bumpTextureIdx != NO_TEXTURE_ATTACHED) {
+                            glActiveTexture(GL_TEXTURE2);
+                            glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.bumpTextureIdx].handle);
+                            glUniform3f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uCameraPos"),
+                                app->camera.Position.x, app->camera.Position.y, app->camera.Position.z);
+                            glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightScale"), 0.1f);
                         }
 
                         Submesh& submesh = mesh.submeshes[i];

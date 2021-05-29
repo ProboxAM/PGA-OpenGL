@@ -482,17 +482,11 @@ void main()
 
 #if defined(VERTEX) ///////////////////////////////////////////////////
 
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec2 aTexCoords;
-layout (location = 3) in vec3 aTangent;
-layout (location = 4) in vec3 aBitangent;
-
-out vec3 FragPos;
-out vec2 TexCoords;
-out vec3 TangentLightPos;
-out vec3 TangentViewPos;
-out vec3 TangentFragPos;
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aTextCoord;
+layout(location = 3) in vec3 aTangent;
+layout(location = 4) in vec3 aBitangent;
 
 layout(binding = 1, std140) uniform LocalParams
 {
@@ -501,48 +495,133 @@ layout(binding = 1, std140) uniform LocalParams
     mat4 uWorldViewProjectionMatrix;
 };
 
-uniform vec3 lightPos;
-uniform vec3 viewPos;
+uniform vec3 uCameraPos;
+
+out vec3 vPosition;
+out vec2 vTexCoord;
+out mat3 TBN;
+out vec3 vTangentFragPos;
+out vec3 vTangentViewPos;
 
 void main()
 {
-    gl_Position      = projection * view * model * vec4(aPos, 1.0);
-    vs_out.FragPos   = vec3(model * vec4(aPos, 1.0));   
-    vs_out.TexCoords = aTexCoords;    
-    
-    vec3 T   = normalize(mat3(model) * aTangent);
-    vec3 B   = normalize(mat3(model) * aBitangent);
-    vec3 N   = normalize(mat3(model) * aNormal);
-    mat3 TBN = transpose(mat3(T, B, N));
+    vTexCoord = aTextCoord;
+    vPosition = (uWorldMatrix * vec4(aPosition, 1.0)).xyz;
 
-    vs_out.TangentLightPos = TBN * lightPos;
-    vs_out.TangentViewPos  = TBN * viewPos;
-    vs_out.TangentFragPos  = TBN * vs_out.FragPos;
-}   
+    // Normal matrix
+    mat3 normalMatrix = transpose(inverse(mat3(uWorldMatrix)));
+
+    // Tangent to world (TBN) matrix
+    vec3 T = normalize(vec3(normalMatrix * aTangent));
+    vec3 N = normalize(vec3(normalMatrix * aNormal));
+    // re-orthogonalize T with respect to N
+    T = normalize(T - dot(T, N) * N);
+    // then retrieve perpendicular vector B with the cross product of T and N
+    vec3 B = cross(N, T);
+    TBN = mat3(T, B, N);
+
+    mat3 TTBN = transpose(TBN);
+
+    vTangentViewPos = TTBN * uCameraPos;
+    vTangentFragPos = TTBN * vPosition;
+
+    gl_Position = uWorldViewProjectionMatrix * vec4(aPosition, 1.0);
+}
 
 #elif defined(FRAGMENT) ///////////////////////////////////////////////
 
-uniform vec3 lightColor;
+in vec3 vPosition;
+in vec2 vTexCoord;
+in mat3 TBN;
+in vec3 vTangentFragPos;
+in vec3 vTangentViewPos;
 
-out vec4 oColor;
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir);
+
+uniform sampler2D uTexture;
+uniform sampler2D uNormalMap;
+uniform sampler2D uHeightMap;
+uniform float uHeightScale;
+
+layout (location = 0) out vec3 gPosition;
+layout (location = 1) out vec4 gAlbedo;
+layout (location = 2) out vec3 gNormal;
+
+layout(binding = 1, std140) uniform LocalParams
+{
+    mat4 uWorldMatrix;
+    mat4 uWorldViewMatrix;
+    mat4 uWorldViewProjectionMatrix;
+};
 
 void main()
-{             
-    oColor = vec4(lightColor, 1.0);
+{    
+    // store the fragment position vector in the first gbuffer texture
+    gPosition = vPosition;
+
+    vec3 viewDir = normalize(vTangentViewPos - vTangentFragPos);
+
+    vec2 BumpedTexCoord = ParallaxMapping(vTexCoord,  viewDir);
+    if(BumpedTexCoord.x > 1.0 || BumpedTexCoord.y > 1.0 || BumpedTexCoord.x < 0.0 || BumpedTexCoord.y < 0.0)
+        discard;
+
+    // and the diffuse per-fragment color
+    gAlbedo = texture(uTexture, BumpedTexCoord);
+
+    // Convert normal from tangent space to world space
+    vec3 tangentSpaceNormal = normalize(texture(uNormalMap, BumpedTexCoord).xyz * 2.0 - 1.0);
+    vec3 worldSpaceNormal = normalize(TBN * tangentSpaceNormal);
+
+    // also store the per-fragment normals into the gbuffer
+    gNormal = worldSpaceNormal;
+}
+
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
+{ 
+    // number of depth layers
+    const float minLayers = 32;
+    const float maxLayers = 64;
+    float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));  
+    // calculate the size of each layer
+    float layerDepth = 1.0 / numLayers;
+    // depth of current layer
+    float currentLayerDepth = 0.0;
+    // the amount to shift the texture coordinates per layer (from vector P)
+    vec2 P = viewDir.xy / viewDir.z * uHeightScale; 
+    vec2 deltaTexCoords = P / numLayers;
+  
+    // get initial values
+    vec2  currentTexCoords     = texCoords;
+    float currentDepthMapValue = texture(uHeightMap, currentTexCoords).r;
+      
+    while(currentLayerDepth < currentDepthMapValue)
+    {
+        // shift texture coordinates along direction of P
+        currentTexCoords -= deltaTexCoords;
+        // get depthmap value at current texture coordinates
+        currentDepthMapValue = texture(uHeightMap, currentTexCoords).r;  
+        // get depth of next layer
+        currentLayerDepth += layerDepth;  
+    }
+    
+    // get texture coordinates before collision (reverse operations)
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+    // get depth after and before collision for linear interpolation
+    float afterDepth  = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = texture(uHeightMap, prevTexCoords).r - currentLayerDepth + layerDepth;
+ 
+    // interpolation of texture coordinates
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+    return finalTexCoords;  
 } 
 
 #endif
 #endif
 
 #ifdef G_BUFFER_NORMAL_MAPPING
-
-struct Light
-{
-    uint type;
-    vec3 color;
-    vec3 direction;
-    vec3 position;
-};
 
 #if defined(VERTEX) ///////////////////////////////////////////////////
 
@@ -560,18 +639,26 @@ layout(binding = 1, std140) uniform LocalParams
 };
 
 out vec3 vPosition;
-out vec3 vTangentLocalSpace;
-out vec3 vBitangentLocalSpace;
-out vec3 vNormalLocalSpace;
 out vec2 vTexCoord;
+out mat3 TBN;
 
 void main()
 {
     vTexCoord = aTextCoord;
     vPosition = (uWorldMatrix * vec4(aPosition, 1.0)).xyz;
-    vTangentLocalSpace = aTangent;
-    vBitangentLocalSpace = aBitangent;
-    vNormalLocalSpace = aNormal;
+
+    // Normal matrix
+    mat3 normalMatrix = transpose(inverse(mat3(uWorldMatrix)));
+
+    // Tangent to world (TBN) matrix
+    vec3 T = normalize(vec3(normalMatrix * aTangent));
+    vec3 N = normalize(vec3(normalMatrix * aNormal));
+    // re-orthogonalize T with respect to N
+    T = normalize(T - dot(T, N) * N);
+    // then retrieve perpendicular vector B with the cross product of T and N
+    vec3 B = cross(N, T);
+    TBN = mat3(T, B, N);
+
 
     gl_Position = uWorldViewProjectionMatrix * vec4(aPosition, 1.0);
 }
@@ -580,10 +667,8 @@ void main()
 
 
 in vec3 vPosition;
-in vec3 vTangentLocalSpace;
-in vec3 vBitangentLocalSpace;
-in vec3 vNormalLocalSpace;
 in vec2 vTexCoord;
+in mat3 TBN;
 
 
 uniform sampler2D uTexture;
@@ -607,18 +692,12 @@ void main()
     // and the diffuse per-fragment color
     gAlbedo = texture(uTexture, vTexCoord);
 
-    // Tangent to local (TBN) matrix
-    vec3 T = normalize(vTangentLocalSpace);
-    vec3 B = normalize(vBitangentLocalSpace);
-    vec3 N = normalize(vNormalLocalSpace);
-    mat3 TBN = mat3(T, B, N);
-    // Convert normal from tangent space to local space and view space
-    vec3 tangentSpaceNormal = texture(uNormalMap, vTexCoord).xyz * 2.0 - vec3(1.0);
-    vec3 localSpaceNormal = TBN * tangentSpaceNormal;
-    vec3 viewSpaceNormal = normalize(uWorldViewMatrix * vec4(localSpaceNormal, 0.0)).xyz;
+    // Convert normal from tangent space to world space
+    vec3 tangentSpaceNormal = normalize(texture(uNormalMap, vTexCoord).xyz * 2.0 - 1.0);
+    vec3 worldSpaceNormal = normalize(TBN * tangentSpaceNormal);
 
     // also store the per-fragment normals into the gbuffer
-    gNormal = viewSpaceNormal;
+    gNormal = worldSpaceNormal;
 } 
 
 #endif
