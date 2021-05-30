@@ -450,7 +450,7 @@ void Init(App* app)
     app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx, app->gProgramIdx }); //Floor
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, -90, { 1, 0, 0 });
 
-    app->mode = Mode_Forward;
+    app->mode = Mode::Mode_Deferred;
 }
 
 void Gui(App* app)
@@ -1011,8 +1011,6 @@ void StencilPass(App* app, unsigned int lightIndex)
    
     // Disable color/depth write and enable stencil
     glDrawBuffer(GL_NONE);
-    glEnable(GL_DEPTH_TEST);
-
     glEnable(GL_DEPTH_TEST);
 
     glDisable(GL_CULL_FACE);
