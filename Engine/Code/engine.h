@@ -145,9 +145,8 @@ struct Entity
 
 enum Mode
 {
-    Mode_TexturedQuad,
-    Mode_Primitive,
-    Mode_AssimpModel,
+    Mode_Forward,
+    Mode_Deferred,
     Mode_Count
 };
 
@@ -196,6 +195,7 @@ struct App
     u32 pointLightDrawProgramIdx;
     u32 gProgramNormalMappingIdx;
     u32 reliefMappingIdx;
+    u32 nullGeometryIdx;
     
     // texture indices
     u32 diceTexIdx;
@@ -249,6 +249,7 @@ struct App
     GLuint diffuseAttachmentHandle;
     GLuint normalsAttachmentHandle;
     GLuint depthAttachmentHandle;
+    GLuint finalAttachmentHandle;
 
     GLuint framebufferHandle;
 };
