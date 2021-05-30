@@ -1,4 +1,7 @@
 #include "Camera.h"
+#include "math.h"
+
+#define PI 3.14159265358979323846
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
 {
@@ -20,7 +23,10 @@ Camera::Camera(float posX, float posY, float posZ, float upX, float upY, float u
 
 glm::mat4 Camera::GetViewMatrix()
 {
-    return glm::lookAt(Position, Position + Front, Up);
+    if(Orbit)
+        return glm::lookAt(Position, LookAt, Up);
+    else
+        return glm::lookAt(Position, Position + Front, Up);
 }
 
 void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
@@ -62,6 +68,32 @@ void Camera::ProcessMouseMovement(float xoffset, float yoffset, GLboolean constr
 
     // update Front, Right and Up Vectors using the updated Euler angles
     updateCameraVectors();
+}
+
+void Camera::ProcessArcBallMovement(float xoffset, float yoffset, float width, float height)
+{
+    glm::vec4 position(Position.x, Position.y, Position.z, 1);
+    glm::vec4 pivot(LookAt.x, LookAt.y, LookAt.z, 1);
+
+    float deltaAngleX = (2 * PI / width); // a movement from left to right = 2*PI = 360 deg
+    float deltaAngleY = (PI / height);  // a movement from top to bottom = PI = 180 de
+
+    xoffset *= deltaAngleX;
+    yoffset *= deltaAngleY;
+
+    glm::mat4x4 rotationMatrixX(1.0f);
+    rotationMatrixX = glm::rotate(rotationMatrixX, xoffset, WorldUp);
+    position = (rotationMatrixX * (position - pivot)) + pivot;
+
+    glm::mat4x4 rotationMatrixY(1.0f);
+    rotationMatrixY = glm::rotate(rotationMatrixY, yoffset, Right);
+    glm::vec3 finalPosition = (rotationMatrixY * (position - pivot)) + pivot;
+
+    Position = std::move(finalPosition);
+    LookAt = std::move(LookAt);
+    Front = glm::normalize(LookAt - Position);
+    Right = glm::normalize(glm::cross(Front, WorldUp)); 
+    Up = glm::normalize(glm::cross(Right, Front));
 }
 
 void Camera::ProcessMouseScroll(float yoffset)

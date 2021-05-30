@@ -29,7 +29,8 @@ public:
     glm::vec3 Up;
     glm::vec3 Right;
     glm::vec3 WorldUp;
-    glm::vec3 Target = {0.0f, 0.0f, 0.0f};
+    glm::vec3 LookAt = {0.0f, 0.0f, 0.0f};
+    bool Orbit = false;
     // euler Angles
     float Yaw;
     float Pitch;
@@ -57,6 +58,8 @@ public:
 
     // processes input received from a mouse input system. Expects the offset value in both the x and y direction.
     void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);
+
+    void ProcessArcBallMovement(float xoffset, float yoffset, float width, float height);
 
     // processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
     void ProcessMouseScroll(float yoffset);

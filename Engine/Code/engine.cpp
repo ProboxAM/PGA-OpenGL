@@ -508,6 +508,16 @@ void Update(App* app)
     ////////////////////////////////////////////MOUSE/////////////////////////////////////////////
     if (app->input.mouseButtons[1] == ButtonState::BUTTON_PRESSED) {
         app->camera.ProcessMouseMovement(app->input.mouseDelta.x, -app->input.mouseDelta.y);
+        app->camera.Orbit = false;
+    }
+
+    if (app->input.mouseButtons[0] == ButtonState::BUTTON_PRESSED) {
+        app->camera.ProcessArcBallMovement(-app->input.mouseDelta.x, -app->input.mouseDelta.y, app->displaySize.x, app->displaySize.y);
+        app->camera.Orbit = true;
+    }
+
+    if (app->input.mouseButtons[0] == ButtonState::BUTTON_RELEASE) {
+        app->camera.Orbit = false;
     }
 
     //GLOBAL AND LOCAL CBUFFER
