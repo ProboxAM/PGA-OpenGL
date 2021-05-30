@@ -16,6 +16,7 @@
 #define BINDING(b) b
 #define NO_TEXTURE_ATTACHED 69
 
+void ForwardRender(App* app);
 void DeferredRender(App* app);
 void PositionRender(App* app);
 void DiffuseRender(App* app);
@@ -449,19 +450,31 @@ void Init(App* app)
     app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx, app->gProgramIdx }); //Floor
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, -90, { 1, 0, 0 });
 
-    app->mode = Mode_Deferred;
+    app->mode = Mode_Forward;
 }
 
 void Gui(App* app)
 {
     ImGui::BeginMainMenuBar();
     {
-        static const char* selections[]{ "Position", "Diffuse", "Normals", "Depth", "Final" };
-        static int selectedTarget = app->renderTarget;
+        static const char* modeSelections[]{ "Forward", "Deferred"};
+        static int selectedMode = app->mode;
 
-        if (ImGui::Combo("RenderTarget", &selectedTarget, selections, ARRAY_COUNT(selections)))
+        if (ImGui::Combo("Render Mode", &selectedMode, modeSelections, ARRAY_COUNT(modeSelections)))
         {
-            app->renderTarget = (RenderTarget)selectedTarget;
+            app->mode = (Mode)selectedMode;
+        }
+
+
+        if (app->mode == Mode::Mode_Deferred)
+        {
+            static const char* selections[]{ "Position", "Diffuse", "Normals", "Depth", "Final" };
+            static int selectedTarget = app->renderTarget;
+
+            if (ImGui::Combo("RenderTarget", &selectedTarget, selections, ARRAY_COUNT(selections)))
+            {
+                app->renderTarget = (RenderTarget)selectedTarget;
+            }
         }
     }
     ImGui::Text("FPS: %f", 1.0f/app->deltaTime);
@@ -591,7 +604,49 @@ void Render(App* app)
     switch (app->mode)
     {
         case Mode_Deferred: DeferredRender(app); break;
+        case Mode_Forward: ForwardRender(app); break;
     }  
+}
+
+void ForwardRender(App* app)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glViewport(0, 0, app->displaySize.x, app->displaySize.y);
+
+    Program& texturedMeshProgram = app->programs[app->texturedGeometryProgramIdx];
+    glUseProgram(texturedMeshProgram.handle);
+    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
+
+    for (const Entity& entity : app->entities)
+    {
+        Model& model = app->models[entity.modelIndex];
+        Mesh& mesh = app->meshes[model.meshIdx];
+
+        glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, entity.localParamsOffset, entity.localParamsSize);
+
+        for (u32 i = 0; i < mesh.submeshes.size(); ++i)
+        {
+            GLuint vao = FindVAO(mesh, i, texturedMeshProgram);
+            glBindVertexArray(vao);
+
+            u32 submeshMaterialIdx = model.materialIdx[i];
+            Material& submeshMaterial = app->materials[submeshMaterialIdx];
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+
+            Submesh& submesh = mesh.submeshes[i];
+            glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+        }
+
+        glBindVertexArray(0);
+    }
+
+    glUseProgram(0);
 }
 
 void DeferredRender(App* app)
@@ -601,18 +656,18 @@ void DeferredRender(App* app)
     //Light Pass
     LightPass(app);
 
-
     //Add depth from gBuffer to the default fbo
     //glBindFramebuffer(GL_READ_FRAMEBUFFER, app->framebufferHandle);
     //glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
     //glBlitFramebuffer(0, 0, app->displaySize.x, app->displaySize.y, 0, 0, app->displaySize.x, app->displaySize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);   
     //glBindFramebuffer(GL_FRAMEBUFFER, 0);
    
+
+    //Quad Render for Selected Texture
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
-    //QUAD RENDERING
     switch (app->renderTarget)
     {
     case RenderTarget::RT_Position:
@@ -709,7 +764,7 @@ void CreateFrameBufferObjects(App* app)
     //Final render target
     glGenTextures(1, &app->finalAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->finalAttachmentHandle);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -994,7 +1049,6 @@ void PointLightPass(App* app, unsigned int lightIndex)
 
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-    glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_ONE, GL_ONE);
 
     glEnable(GL_CULL_FACE);
@@ -1043,7 +1097,6 @@ void DirectionalLightPass(App* app)
     glDrawBuffer(GL_COLOR_ATTACHMENT3);
 
     glEnable(GL_BLEND);
-    glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_ONE, GL_ONE);
 
     //Render directional light into a quad using gBuffer textures

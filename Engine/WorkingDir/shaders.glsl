@@ -132,8 +132,6 @@ layout(binding = 0, std140) uniform GlobalParams
 };
 
 layout(location = 0) out vec4 oColor;
-layout(location = 1) out vec4 diffuseColor;
-layout(location = 2) out vec4 normalColor;
 
 void main()
 {
@@ -157,24 +155,22 @@ void main()
             case 1:
             {
                 //Point
-                vec3 pointDirection = normalize(uLight[i].position - vPosition);
-                float cosAngle = max(dot(vNormal, pointDirection), 0.0); 
-
+                // diffuse
+                vec3 lightDir = normalize(uLight[i].position - vPosition);
+                vec3 diffuse = 0.6 * max(dot(vNormal, lightDir), 0.0) * textureColor * uLight[i].color;
+                vec3 ambient = 0.1 * textureColor;
+          
+                // attenuation
                 float distance = length(uLight[i].position - vPosition);
-                float attenuation = 1.0 / (0.25 + 0.5 * distance + 
-                                     0.25 * (distance * distance));
+                float attenuation = 1.0 / (1.0 + 0.14 * distance + 0.07 * (distance * distance));
+                diffuse *= attenuation;
 
-                vec3 ambient = (0.2 * uLight[i].color) * attenuation;
-                vec3 diffuse = (0.6 * uLight[i].color * cosAngle) * attenuation;
-
-                finalColor += (ambient + diffuse) * textureColor;
+                finalColor += diffuse;
             } break;
         }
     }
 
     oColor = vec4(finalColor, 1.0);
-    diffuseColor = vec4(textureColor, 1.0);
-    normalColor = vec4(vNormal * 0.5 + 0.5, 1.0);
 }
 
 #endif
@@ -329,7 +325,7 @@ void main()
             //Directional
             float cosAngle = max(dot(Normal, -uLight[i].direction), 0.0); 
             vec3 ambient = 0.1 * uLight[i].color;
-            vec3 diffuse = 0.9 * uLight[i].color * cosAngle;
+            vec3 diffuse = 0.6 * uLight[i].color * cosAngle;
 
             finalColor += (ambient + diffuse) * Diffuse;
         }
@@ -402,7 +398,7 @@ void main()
     //Point          
     // diffuse
     vec3 lightDir = normalize(uLight[gLightIndex].position - Position);
-    vec3 diffuse = 0.9 * max(dot(Normal, lightDir), 0.0) * Diffuse * uLight[gLightIndex].color;
+    vec3 diffuse = 0.6 * max(dot(Normal, lightDir), 0.0) * Diffuse * uLight[gLightIndex].color;
     vec3 ambient = 0.1 * Diffuse;
           
     // attenuation
