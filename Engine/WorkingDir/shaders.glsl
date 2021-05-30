@@ -333,23 +333,6 @@ void main()
 
             finalColor += (ambient + diffuse) * Diffuse;
         }
-
-        if(uLight[i].type == 1)
-        {            
-            //Point          
-            // diffuse
-            vec3 lightDir = normalize(uLight[i].position - Position);
-            vec3 diffuse = 0.9 * max(dot(Normal, lightDir), 0.0) * uLight[i].color;
-            vec3 ambient = 0.1 * uLight[i].color;
-          
-            // attenuation
-            float distance = length(uLight[i].position - Position);
-            float attenuation = 1.0 / (1.0 + 0.14 * distance + 0.07 * (distance * distance));
-            diffuse *= attenuation;
-            ambient *= attenuation;
-
-            finalColor += (ambient + diffuse) * Diffuse;
-        }
     }
 
     oColor = vec4(finalColor, 1.0);
@@ -388,6 +371,7 @@ void main()
 #elif defined(FRAGMENT) ///////////////////////////////////////////////
 
 uniform vec2 gScreenSize;
+uniform uint gLightIndex;
 
 layout(binding = 0, std140) uniform GlobalParams
 {
@@ -414,27 +398,19 @@ void main()
     
     // then calculate lighting as usual
     vec3 finalColor = vec3(0);
-    float depth = texture(gDepth, vTexCoord);
-
-    //TODO: Sum all lights
-    for(uint i = 0; i < uLightCount; ++i)
-    {
-        if(uLight[i].type == 1)
-        {            
-            //Point          
-            // diffuse
-            vec3 lightDir = normalize(uLight[i].position - Position);
-            vec3 diffuse = 0.9 * max(dot(Normal, lightDir), 0.0) * Diffuse * uLight[i].color;
-            vec3 ambient = 0.1 * Diffuse;
+         
+    //Point          
+    // diffuse
+    vec3 lightDir = normalize(uLight[gLightIndex].position - Position);
+    vec3 diffuse = 0.9 * max(dot(Normal, lightDir), 0.0) * Diffuse * uLight[gLightIndex].color;
+    vec3 ambient = 0.1 * Diffuse;
           
-            // attenuation
-            float distance = length(uLight[i].position - Position);
-            float attenuation = 1.0 / (1.0 + 0.14 * distance + 0.07 * (distance * distance));
-            diffuse *= attenuation;
+    // attenuation
+    float distance = length(uLight[gLightIndex].position - Position);
+    float attenuation = 1.0 / (1.0 + 0.14 * distance + 0.07 * (distance * distance));
+    diffuse *= attenuation;
 
-            finalColor += diffuse;
-        }
-    }
+    finalColor += diffuse;
 
     oColor = vec4(finalColor, 1.0);
 } 
@@ -698,6 +674,32 @@ void main()
 
     // also store the per-fragment normals into the gbuffer
     gNormal = worldSpaceNormal;
+} 
+
+#endif
+#endif
+
+#ifdef NULL_GEOMETRY
+
+#if defined(VERTEX) ///////////////////////////////////////////////////
+
+layout(location = 0) in vec3 aPosition;
+
+layout(binding = 1, std140) uniform LocalParams
+{
+    mat4 uWorldViewProjectionMatrix;
+};
+
+void main()
+{
+    gl_Position = uWorldViewProjectionMatrix * vec4(aPosition, 1.0);
+}
+
+#elif defined(FRAGMENT) ///////////////////////////////////////////////
+
+void main()
+{             
+
 } 
 
 #endif

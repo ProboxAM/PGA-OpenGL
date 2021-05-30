@@ -16,12 +16,16 @@
 #define BINDING(b) b
 #define NO_TEXTURE_ATTACHED 69
 
+void DeferredRender(App* app);
 void PositionRender(App* app);
 void DiffuseRender(App* app);
 void NormalRender(App* app);
 void DepthRender(App* app);
 void FinalRender(App* app);
-void PointLightPass(App* app);
+void GeometryPass(App* app);
+void LightPass(App* app);
+void StencilPass(App* app, unsigned int lightIndex);
+void PointLightPass(App* app, unsigned int lightIndex);
 void DirectionalLightPass(App* app);
 void PointLightDraw(App* app);
 float CalcPointLightRadius(const Light& Light);
@@ -344,27 +348,24 @@ void Init(App* app)
     app->models[app->cubeBumpIdx].materialIdx[0] = GenerateCustomMaterial(app, app->woodBaseTexIdx, app->woodNormalTexIdx, app->woodHeightTexIdx);
 
     //Create lights
-    //app->lights.push_back(Light{ LightType_Directional, {1.0, 1.0, 1.0}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} }); //side directional
-    //app->lights.push_back(Light{ LightType_Directional, {0.35, 0.35, 0.35}, {0.0, 0.0, 1.0}, {0.0, 0.0, 0.0} }); //frontal directional
-    //const unsigned int NR_LIGHTS = 14;
-    //srand(app->deltaTime);
-    //for (unsigned int i = 0; i < NR_LIGHTS; i++)
-    //{
-    //    // calculate slightly random offsets
-    //    float xPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
-    //    float yPos = ((rand() % 100) / 100.0) * 3.0;
-    //    float zPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
-    //    vec3 lightPosition = glm::vec3(xPos, yPos, zPos);
-    //    // also calculate random color
-    //    float rColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
-    //    float gColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
-    //    float bColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
-    //    vec3 lightColor = glm::vec3(rColor, gColor, bColor);
+    //app->lights.push_back(Light{ LightType_Directional, {0.15, 0.15, 0.15}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} }); //side directional
+    const unsigned int NR_LIGHTS = 14;
+    srand(app->deltaTime);
+    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    {
+        // calculate slightly random offsets
+        float xPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
+        float yPos = ((rand() % 100) / 100.0) * 3.0;
+        float zPos = ((rand() % 100) / 100.0) * 50.0 - 25.0;
+        vec3 lightPosition = glm::vec3(xPos, yPos, zPos);
+        // also calculate random color
+        float rColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+        float gColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+        float bColor = ((rand() % 100) / 200.0f) + 0.5; // between 0.5 and 1.0
+        vec3 lightColor = glm::vec3(rColor, gColor, bColor);
 
-    //    app->lights.push_back(Light{ LightType_Point, lightColor, {0.0, 0.0, 0.0}, lightPosition });
-    //}
-
-    app->lights.push_back(Light{ LightType_Point, {1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 2.0, -1.0} });
+        app->lights.push_back(Light{ LightType_Point, lightColor, {0.0, 0.0, 0.0}, lightPosition });
+    }
 
     //Program
     app->texturedGeometryProgramIdx = InitProgram(app, "shaders.glsl", "SHOW_TEXTURED_MESH");
@@ -376,6 +377,7 @@ void Init(App* app)
     app->pointLightDrawProgramIdx = InitProgram(app, "shaders.glsl", "POINT_LIGHT_DEBUG");
     app->reliefMappingIdx = InitProgram(app, "shaders.glsl", "RELIEF_MAPPING");
     app->gProgramNormalMappingIdx = InitProgram(app, "shaders.glsl", "G_BUFFER_NORMAL_MAPPING");
+    app->nullGeometryIdx = InitProgram(app, "shaders.glsl", "NULL_GEOMETRY");
 
     ////////////////////////////////
     app->programUniformTexture = glGetUniformLocation(app->programs[app->texturedGeometryProgramIdx].handle, "uTexture");
@@ -442,10 +444,12 @@ void Init(App* app)
     app->entities.push_back(Entity{ TransformPositionScale({1, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramIdx }); //Cube
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
 
+    app->entities.push_back(Entity{ TransformPositionScale({-3.0, 1.0, 0}, {0.2, 0.2, 0.2}), app->sphereIdx, app->gProgramIdx }); //Floor
+
     app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx, app->gProgramIdx }); //Floor
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, -90, { 1, 0, 0 });
 
-    app->mode = Mode_TexturedQuad;
+    app->mode = Mode_Deferred;
 }
 
 void Gui(App* app)
@@ -582,115 +586,55 @@ void Render(App* app)
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
 
     switch (app->mode)
     {
-        case Mode_TexturedQuad:
-            {
-                //Render on this framebuffer render targets
-                glBindFramebuffer(GL_FRAMEBUFFER, app->framebufferHandle);
+        case Mode_Deferred: DeferredRender(app); break;
+    }  
+}
 
-                GLuint drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-                glDrawBuffers(ARRAY_COUNT(drawBuffers), drawBuffers);
+void DeferredRender(App* app)
+{
+    //Geomtry Pass
+    GeometryPass(app);
+    //Light Pass
+    LightPass(app);
 
-                // TODO: Draw your textured quad here!
-                // - clear the framebuffer
-                // - set the viewport
-                // - set the blending state
-                // - bind the texture into unit 0
-                // - bind the program 
-                //   (...and make its texture sample from unit 0)
-                // - bind the vao
-                // - glDrawElements() !!!
 
-                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-                glViewport(0, 0, app->displaySize.x, app->displaySize.y);
-
-                for(const Entity &entity : app->entities)
-                {
-
-                    Model& model = app->models[entity.modelIndex];
-                    Mesh& mesh = app->meshes[model.meshIdx];
-
-                    Program& texturedMeshProgram = app->programs[entity.programIdx];
-                    glUseProgram(texturedMeshProgram.handle);
-
-                    //glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
-
-                    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, entity.localParamsOffset, entity.localParamsSize);
-
-                    for (u32 i = 0; i < mesh.submeshes.size(); ++i)
-                    {
-                        GLuint vao = FindVAO(mesh, i, texturedMeshProgram);
-                        glBindVertexArray(vao);
-
-                        u32 submeshMaterialIdx = model.materialIdx[i];
-                        Material& submeshMaterial = app->materials[submeshMaterialIdx];
-
-                        glActiveTexture(GL_TEXTURE0);
-                        glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
-
-                        if (submeshMaterial.normalTextureIdx != NO_TEXTURE_ATTACHED) {
-                            glActiveTexture(GL_TEXTURE1);
-                            glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.normalTextureIdx].handle);
-                        }
-
-                        if (submeshMaterial.bumpTextureIdx != NO_TEXTURE_ATTACHED) {
-                            glActiveTexture(GL_TEXTURE2);
-                            glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.bumpTextureIdx].handle);
-                            glUniform3f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uCameraPos"),
-                                app->camera.Position.x, app->camera.Position.y, app->camera.Position.z);
-                            glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightScale"), 0.1f);
-                        }
-
-                        Submesh& submesh = mesh.submeshes[i];
-                        glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
-                    }
-
-                    glBindVertexArray(0);
-                }
-                
-                glUseProgram(0);
-            }
-            break;
-    }
-
-    //QUAD RENDERING
-    glDepthMask(GL_FALSE);
-    
     //Add depth from gBuffer to the default fbo
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, app->framebufferHandle);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
-    glBlitFramebuffer(0, 0, app->displaySize.x, app->displaySize.y, 0, 0, app->displaySize.x, app->displaySize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    //glBindFramebuffer(GL_READ_FRAMEBUFFER, app->framebufferHandle);
+    //glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+    //glBlitFramebuffer(0, 0, app->displaySize.x, app->displaySize.y, 0, 0, app->displaySize.x, app->displaySize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);   
+    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
+    //QUAD RENDERING
     switch (app->renderTarget)
     {
-        case RenderTarget::RT_Position:
-        {
-            PositionRender(app);
-        }break;
-        case RenderTarget::RT_Diffuse: 
-        {
-            DiffuseRender(app);
-        }break;
-        case RenderTarget::RT_Depth:
-        {
-            DepthRender(app);
-        }break;
-        case RenderTarget::RT_Normals:
-        {
-            NormalRender(app);
-        }break;
-        case RenderTarget::RT_Final:
-        {
-            FinalRender(app);          
-        }break;
+    case RenderTarget::RT_Position:
+    {
+        PositionRender(app);
+    }break;
+    case RenderTarget::RT_Diffuse:
+    {
+        DiffuseRender(app);
+    }break;
+    case RenderTarget::RT_Depth:
+    {
+        DepthRender(app);
+    }break;
+    case RenderTarget::RT_Normals:
+    {
+        NormalRender(app);
+    }break;
+    case RenderTarget::RT_Final:
+    {
+        FinalRender(app);
+    }break;
     }
 }
 
@@ -762,10 +706,19 @@ void CreateFrameBufferObjects(App* app)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    //Final render target
+    glGenTextures(1, &app->finalAttachmentHandle);
+    glBindTexture(GL_TEXTURE_2D, app->finalAttachmentHandle);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, app->displaySize.x, app->displaySize.y, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     //Depth render target              
     glGenTextures(1, &app->depthAttachmentHandle);
     glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, app->displaySize.x, app->displaySize.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, app->displaySize.x, app->displaySize.y, 0, GL_DEPTH_STENCIL,
+                    GL_FLOAT_32_UNSIGNED_INT_24_8_REV, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -776,7 +729,8 @@ void CreateFrameBufferObjects(App* app)
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, app->positionAttachmentHandle, 0);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, app->diffuseAttachmentHandle, 0);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, app->normalsAttachmentHandle, 0);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, app->depthAttachmentHandle, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, app->finalAttachmentHandle, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, app->depthAttachmentHandle, 0);
     
     GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER); 
     if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE)
@@ -799,8 +753,100 @@ void CreateFrameBufferObjects(App* app)
 
 }
 
-void HandleInput()
+void GeometryPass(App* app)
 {
+    //Render on this framebuffer render targets
+    glBindFramebuffer(GL_FRAMEBUFFER, app->framebufferHandle);
+
+    GLuint drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(ARRAY_COUNT(drawBuffers), drawBuffers);
+
+    // TODO: Draw your textured quad here!
+    // - clear the framebuffer
+    // - set the viewport
+    // - set the blending state
+    // - bind the texture into unit 0
+    // - bind the program 
+    //   (...and make its texture sample from unit 0)
+    // - bind the vao
+    // - glDrawElements() !!!
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glViewport(0, 0, app->displaySize.x, app->displaySize.y);
+
+    for (const Entity& entity : app->entities)
+    {
+
+        Model& model = app->models[entity.modelIndex];
+        Mesh& mesh = app->meshes[model.meshIdx];
+
+        Program& texturedMeshProgram = app->programs[entity.programIdx];
+        glUseProgram(texturedMeshProgram.handle);
+
+        //glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
+
+        glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, entity.localParamsOffset, entity.localParamsSize);
+
+        for (u32 i = 0; i < mesh.submeshes.size(); ++i)
+        {
+            GLuint vao = FindVAO(mesh, i, texturedMeshProgram);
+            glBindVertexArray(vao);
+
+            u32 submeshMaterialIdx = model.materialIdx[i];
+            Material& submeshMaterial = app->materials[submeshMaterialIdx];
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
+
+            if (submeshMaterial.normalTextureIdx != NO_TEXTURE_ATTACHED) {
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.normalTextureIdx].handle);
+            }
+
+            if (submeshMaterial.bumpTextureIdx != NO_TEXTURE_ATTACHED) {
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.bumpTextureIdx].handle);
+                glUniform3f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uCameraPos"),
+                    app->camera.Position.x, app->camera.Position.y, app->camera.Position.z);
+                glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightScale"), 0.1f);
+            }
+
+            Submesh& submesh = mesh.submeshes[i];
+            glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+        }
+
+        glBindVertexArray(0);
+    }
+
+    glUseProgram(0);
+}
+
+void LightPass(App* app)
+{
+    glDepthMask(GL_FALSE);
+
+    glDrawBuffer(GL_COLOR_ATTACHMENT3);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    //Point light with stencil
+    glEnable(GL_STENCIL_TEST);
+
+    for (unsigned int i = 0; i < app->lights.size(); i++) {
+        if (app->lights[i].type == LightType_Point) //Point Light
+        {
+            //Stencil pass for sphere light volume
+            StencilPass(app, i);
+            //Point pass using sphere light volume, not working currently because of depth of volume issues
+            PointLightPass(app, i);
+        }
+    }
+
+    glDisable(GL_STENCIL_TEST);
+   
+    //Directional pass using a quad
+    DirectionalLightPass(app);
 }
 
 void PositionRender(App* app)
@@ -885,21 +931,72 @@ void NormalRender(App* app)
 
 void FinalRender(App* app)
 {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    Program& program = app->programs[app->texturedQuadProgramIdx];
+    glUseProgram(program.handle);
 
-    //Point pass using sphere light volume, not working currently because of depth of volume issues
-    PointLightPass(app);
+    Mesh& mesh = app->meshes[app->quadIdx];
+    GLuint vao = FindVAO(mesh, 0, program);
+    glBindVertexArray(vao);
 
-    //Directional pass + point light both using a quad, because couldn't make sphere volume work properly
-    DirectionalLightPass(app);
+    glUniform1i(app->quadProgramUniformTexture, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->finalAttachmentHandle);
 
-    //Point Light debug draw
-   // PointLightDraw(app);
+    Submesh& submesh = mesh.submeshes[0];
+    glDrawElements(GL_TRIANGLES, submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)submesh.indexOffset);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 
-void PointLightPass(App* app)
+void StencilPass(App* app, unsigned int lightIndex)
 {
+    Program& program = app->programs[app->nullGeometryIdx];
+    glUseProgram(program.handle);
+   
+    // Disable color/depth write and enable stencil
+    glDrawBuffer(GL_NONE);
+    glEnable(GL_DEPTH_TEST);
+
+    glEnable(GL_DEPTH_TEST);
+
+    glDisable(GL_CULL_FACE);
+
+    glClear(GL_STENCIL_BUFFER_BIT);
+
+    // We need the stencil test to be enabled but we want it
+    // to succeed always. Only the depth test matters.
+    glStencilFunc(GL_ALWAYS, 0, 0);
+
+    glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR_WRAP, GL_KEEP);
+    glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_DECR_WRAP, GL_KEEP);
+
+    //Render Sphere
+
+    Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
+    Submesh point_submesh = point_mesh.submeshes[0];
+
+    GLuint pointVao = FindVAO(point_mesh, 0, program);
+    glBindVertexArray(pointVao);
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->lightsBuffer.handle, app->lights[lightIndex].localParamsOffset, app->lights[lightIndex].localParamsSize);
+
+    glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
+
+    glBindVertexArray(0);
+}
+
+void PointLightPass(App* app, unsigned int lightIndex)
+{
+    glDrawBuffer(GL_COLOR_ATTACHMENT3);
+
+    glStencilFunc(GL_NOTEQUAL, 0, 0xFF);
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_ONE, GL_ONE);
+
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
 
@@ -912,40 +1009,43 @@ void PointLightPass(App* app)
     Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
     Submesh point_submesh = point_mesh.submeshes[0];
 
-    for (const Light& light : app->lights)
-    {
-        if (light.type == LightType_Point) //Point Light
-        {     
-            GLuint pointVao = FindVAO(point_mesh, 0, program);
-            glBindVertexArray(pointVao);
+    GLuint pointVao = FindVAO(point_mesh, 0, program);
+    glBindVertexArray(pointVao);
 
-            glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->lightsBuffer.handle, light.localParamsOffset, light.localParamsSize);
-            glUniform2f(glGetUniformLocation(program.handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y);
+    glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->lightsBuffer.handle, app->lights[lightIndex].localParamsOffset, app->lights[lightIndex].localParamsSize);
+    glUniform2f(glGetUniformLocation(program.handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y);
+    glUniform1ui(glGetUniformLocation(program.handle, "gLightIndex"), lightIndex);
       
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
 
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, app->normalsAttachmentHandle);
 
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, app->diffuseAttachmentHandle);
 
-            glActiveTexture(GL_TEXTURE3);
-            glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, app->depthAttachmentHandle);
 
-            glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
+    glDrawElements(GL_TRIANGLES, point_submesh.indices.size(), GL_UNSIGNED_INT, (void*)(u64)point_submesh.indexOffset);
 
-            glBindVertexArray(0);
-        }
-    }
+    glBindVertexArray(0);
+
     glUseProgram(0);
+
     glCullFace(GL_BACK);
-    glDisable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
 }
 
 void DirectionalLightPass(App* app)
 {
+    glDrawBuffer(GL_COLOR_ATTACHMENT3);
+
+    glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_ONE, GL_ONE);
+
     //Render directional light into a quad using gBuffer textures
     Program& program = app->programs[app->deferredDirectionalProgramIdx];
     glUseProgram(program.handle);
@@ -970,6 +1070,8 @@ void DirectionalLightPass(App* app)
 
     glBindVertexArray(0);
     glUseProgram(0);
+
+    glDisable(GL_BLEND);
 }
 
 void PointLightDraw(App* app)
