@@ -508,12 +508,14 @@ in mat3 TBN;
 in vec3 vTangentFragPos;
 in vec3 vTangentViewPos;
 
-vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir);
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, out float parallaxHeight);
 
 uniform sampler2D uTexture;
 uniform sampler2D uNormalMap;
 uniform sampler2D uHeightMap;
 uniform float uHeightScale;
+uniform float zNear;
+uniform float zFar;
 
 layout (location = 0) out vec3 gPosition;
 layout (location = 1) out vec4 gAlbedo;
@@ -533,7 +535,8 @@ void main()
 
     vec3 viewDir = normalize(vTangentViewPos - vTangentFragPos);
 
-    vec2 BumpedTexCoord = ParallaxMapping(vTexCoord,  viewDir);
+    float parallaxHeight = 0.0f;
+    vec2 BumpedTexCoord = ParallaxMapping(vTexCoord,  viewDir, parallaxHeight);
     if(BumpedTexCoord.x > 1.0 || BumpedTexCoord.y > 1.0 || BumpedTexCoord.x < 0.0 || BumpedTexCoord.y < 0.0)
         discard;
 
@@ -544,11 +547,15 @@ void main()
     vec3 tangentSpaceNormal = normalize(texture(uNormalMap, BumpedTexCoord).xyz * 2.0 - 1.0);
     vec3 worldSpaceNormal = normalize(TBN * tangentSpaceNormal);
 
+    vec3 tmpPos = vPosition;
+    tmpPos += TBN * (parallaxHeight * viewDir);
+    gl_FragDepth = ((tmpPos.z * (zFar + zNear)) + (2 * (zFar * zNear))) / tmpPos.z * (zFar - zNear);
+
     // also store the per-fragment normals into the gbuffer
     gNormal = worldSpaceNormal;
 }
 
-vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
+vec2 ParallaxMapping(in vec2 texCoords, in vec3 viewDir, out float parallaxHeight)
 { 
     // number of depth layers
     const float minLayers = 32;
@@ -586,6 +593,9 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
     // interpolation of texture coordinates
     float weight = afterDepth / (afterDepth - beforeDepth);
     vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+    // interpolation of depth values
+    parallaxHeight = currentLayerDepth + beforeDepth * weight + afterDepth * (1.0 - weight);
 
     return finalTexCoords;  
 } 

@@ -876,6 +876,8 @@ void GeometryPass(App* app)
                 glUniform3f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uCameraPos"),
                     app->camera.Position.x, app->camera.Position.y, app->camera.Position.z);
                 glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightScale"), 0.1f);
+                glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "zNear"), app->camera.NearPlane);
+                glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "zFar"), app->camera.FarPlane);
             }
 
             Submesh& submesh = mesh.submeshes[i];
