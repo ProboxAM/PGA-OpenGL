@@ -1,6 +1,7 @@
 # Advanced Graphics Programming
 ## Authors
 [Axel Alavedra Cabello](https://github.com/AxelAlavedra)
+
 [Marc Guillen Salto](https://github.com/Marcgs96)
 
 ## Content
