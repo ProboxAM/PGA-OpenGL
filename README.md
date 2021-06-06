@@ -18,11 +18,13 @@
 ### Normal Mapping
 The Normal Mapping we implemented only works for the Deferred Shading, if the user swaps to Forward Shading the diference can be easily observed.
 The shader can be found inside the [shaders.glsl](https://github.com/ProboxAM/PGA-OpenGL/blob/main/Engine/WorkingDir/shaders.glsl) file under the name G_BUFFER_NORMAL_MAPPING.
+
 ![Comparison Image](/images/normalMapping.png)
 
 ### Parallax Occlusion Mapping
 The Parallax Occlusion Mapping we implemented only works for the Deferred Shading, if the user swaps to Forward Shading the diference can be easily observed.
 The shader can be found inside the [shaders.glsl](https://github.com/ProboxAM/PGA-OpenGL/blob/main/Engine/WorkingDir/shaders.glsl) file under the name RELIEF_MAPPING.
+
 ![Comparison Image](/images/parallaxOcclusionMapping.png)
 
 ## Repository
