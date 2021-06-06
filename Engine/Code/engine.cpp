@@ -350,7 +350,7 @@ void Init(App* app)
 
     //Create lights
     //app->lights.push_back(Light{ LightType_Directional, {0.15, 0.15, 0.15}, {-1.0, -1.0, 0.0}, {0.0, 0.0, 0.0} }); //side directional
-    const unsigned int NR_LIGHTS = 14;
+    /*const unsigned int NR_LIGHTS = 14;
     srand(app->deltaTime);
     for (unsigned int i = 0; i < NR_LIGHTS; i++)
     {
@@ -366,7 +366,8 @@ void Init(App* app)
         vec3 lightColor = glm::vec3(rColor, gColor, bColor);
 
         app->lights.push_back(Light{ LightType_Point, lightColor, {0.0, 0.0, 0.0}, lightPosition });
-    }
+    }*/
+    app->lights.push_back(Light{ LightType_Point, {1,1,1}, {0.0, 0.0, 0.0}, {0,0.5,-1} });
 
     //Program
     app->texturedGeometryProgramIdx = InitProgram(app, "shaders.glsl", "SHOW_TEXTURED_MESH");
@@ -436,16 +437,17 @@ void Init(App* app)
     //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
     //app->entities.push_back(Entity{ TransformPositionScale({-10, 3, 10}, {1.0, 1.0, 1.0}), app->patrickIdx }); //Patrick
     //app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
-    app->entities.push_back(Entity{ TransformPositionScale({-1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramNormalMappingIdx }); //Cube
+   
+    app->entities.push_back(Entity{ TransformPositionScale({-1.0, 0.5, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramNormalMappingIdx }); //Cube
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
 
-    app->entities.push_back(Entity{ TransformPositionScale({-3.0, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeBumpIdx, app->reliefMappingIdx }); //Cube
+    app->entities.push_back(Entity{ TransformPositionScale({-3.0, 0.5, 0.0}, {1.0, 1.0, 1.0}), app->cubeBumpIdx, app->reliefMappingIdx }); //Cube
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
 
-    app->entities.push_back(Entity{ TransformPositionScale({1, 1.0, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramIdx }); //Cube
+    app->entities.push_back(Entity{ TransformPositionScale({1, 0.5, 0.0}, {1.0, 1.0, 1.0}), app->cubeIdx, app->gProgramIdx }); //Cube
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, 180, { 0, 1, 0 });
 
-    app->entities.push_back(Entity{ TransformPositionScale({-3.0, 1.0, 0}, {0.2, 0.2, 0.2}), app->sphereIdx, app->gProgramIdx }); //Floor
+    //app->entities.push_back(Entity{ TransformPositionScale({-3.0, 1.0, 0}, {0.2, 0.2, 0.2}), app->sphereIdx, app->gProgramIdx }); //Floor
 
     app->entities.push_back(Entity{ TransformPositionScale({0, -0.5, 0}, {100.0, 1.0, 100.0}), app->quadIdx, app->gProgramIdx }); //Floor
     app->entities.back().worldMatrix = TransformRotation(app->entities.back().worldMatrix, -90, { 1, 0, 0 });
