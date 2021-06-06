@@ -5,12 +5,12 @@
 [Marc Guillen Salto](https://github.com/Marcgs96)
 
 ## Content
-* Deferred Shading Implemented.
-* G-Buffer with Position, Normal, Diffuse and Depth textures.
+* Deferred Shading and Forward Shading Implemented with a selectable to swap between them.
+* G-Buffer with Position, Normal, Diffuse and Depth textures, selectable to render each different texture.
 * Directional Light Pass rendering through a Quad.
 * Point Light Pass through usage of Light Volumes with Spheres adjusted to radius of light.
 * WASD for Camera Movement, Hold Right Click for Camera Rotation and Hold Shift for Camera "Sprint".
-* Orbit around center of the scene using .
+* Orbit around origin of the scene Holding Left Click.
 * Normal Mapping.
 * Parallax Occlusion Mapping.
 
