@@ -597,7 +597,8 @@ void Update(App* app)
     UnmapBuffer(app->cbuffer);
 
     MapBuffer(app->lightsBuffer, GL_WRITE_ONLY);
-    // -- Light params
+
+    // -- Light params to create Light Volumes
     for (Light& light : app->lights)
     {
         if (light.type != LightType_Point) //Point Light
@@ -607,7 +608,6 @@ void Update(App* app)
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, light.position);
         model = glm::scale(model, glm::vec3(CalcPointLightRadius(light))); //this is for sphere light volume, makes sphere size same as radius of light
-        //model = glm::scale(model, glm::vec3(0.25f)); //small size for forward rendering sphere
         glm::mat4 worldViewProjection = projection * view * model;
 
         light.localParamsOffset = app->lightsBuffer.head;
@@ -621,11 +621,13 @@ void Update(App* app)
 
 void Render(App* app)
 {
+    //OpenGL Settings
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
 
+    //Select mode of rendering (Forward or Deferred)
     switch (app->mode)
     {
         case Mode_Deferred: DeferredRender(app); break;
@@ -642,19 +644,25 @@ void ForwardRender(App* app)
 
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
+    //Select basic textured geometry program
     Program& texturedMeshProgram = app->programs[app->texturedGeometryProgramIdx];
     glUseProgram(texturedMeshProgram.handle);
+
+    //Pass light buffer
     glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
 
+    //Iterate entities to render each one
     for (const Entity& entity : app->entities)
     {
         Model& model = app->models[entity.modelIndex];
         Mesh& mesh = app->meshes[model.meshIdx];
 
+        //Pass local buffer with matrices
         glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, entity.localParamsOffset, entity.localParamsSize);
 
         for (u32 i = 0; i < mesh.submeshes.size(); ++i)
         {
+            //Find or generate vao for used program and mesh
             GLuint vao = FindVAO(mesh, i, texturedMeshProgram);
             glBindVertexArray(vao);
 
@@ -681,18 +689,13 @@ void DeferredRender(App* app)
     //Light Pass
     LightPass(app);
 
-    //Add depth from gBuffer to the default fbo
-    //glBindFramebuffer(GL_READ_FRAMEBUFFER, app->framebufferHandle);
-    //glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
-    //glBlitFramebuffer(0, 0, app->displaySize.x, app->displaySize.y, 0, 0, app->displaySize.x, app->displaySize.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);   
-    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
-   
 
-    //Quad Render for Selected Texture
+    //Settings for Quad Rendering of Texture, Swapping to default buffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glViewport(0, 0, app->displaySize.x, app->displaySize.y);
 
+    //Quad Render for Selected Texture
     switch (app->renderTarget)
     {
     case RenderTarget::RT_Position:
@@ -838,6 +841,7 @@ void GeometryPass(App* app)
     //Render on this framebuffer render targets
     glBindFramebuffer(GL_FRAMEBUFFER, app->framebufferHandle);
 
+    //Color attachments
     GLuint drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(ARRAY_COUNT(drawBuffers), drawBuffers);
 
@@ -867,14 +871,17 @@ void GeometryPass(App* app)
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.albedoTextureIdx].handle);
 
+            //Check if uses normal mapping
             if (submeshMaterial.normalTextureIdx != NO_TEXTURE_ATTACHED) {
                 glActiveTexture(GL_TEXTURE1);
                 glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.normalTextureIdx].handle);
             }
 
+            //Check if uses parallax occlusion mapping
             if (submeshMaterial.bumpTextureIdx != NO_TEXTURE_ATTACHED) {
                 glActiveTexture(GL_TEXTURE2);
                 glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.bumpTextureIdx].handle);
+                //Pass uniforms for calculations and settings
                 glUniform3f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uCameraPos"),
                     app->camera.Position.x, app->camera.Position.y, app->camera.Position.z);
                 glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightScale"), app->heightScale);
@@ -905,6 +912,7 @@ void LightPass(App* app)
     //Point light with stencil
     glEnable(GL_STENCIL_TEST);
 
+    //For Point Light Pass we do it each light at a time so we can use stencil.
     for (unsigned int i = 0; i < app->lights.size(); i++) {
         if (app->lights[i].type == LightType_Point) //Point Light
         {
@@ -1041,8 +1049,7 @@ void StencilPass(App* app, unsigned int lightIndex)
     glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR_WRAP, GL_KEEP);
     glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_DECR_WRAP, GL_KEEP);
 
-    //Render Sphere
-
+    //Render Sphere to obtain depth of light volume
     Mesh point_mesh = app->meshes[app->models[app->sphereIdx].meshIdx];
     Submesh point_submesh = point_mesh.submeshes[0];
 
@@ -1058,8 +1065,10 @@ void StencilPass(App* app, unsigned int lightIndex)
 
 void PointLightPass(App* app, unsigned int lightIndex)
 {
+    //Select color attachment 3 to render. Final Render Texture. 
     glDrawBuffer(GL_COLOR_ATTACHMENT3);
 
+    //OpenGL Settings for light pass using stencil previously generated
     glStencilFunc(GL_NOTEQUAL, 0, 0xFF);
 
     glDisable(GL_DEPTH_TEST);
@@ -1082,8 +1091,8 @@ void PointLightPass(App* app, unsigned int lightIndex)
     glBindVertexArray(pointVao);
 
     glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->lightsBuffer.handle, app->lights[lightIndex].localParamsOffset, app->lights[lightIndex].localParamsSize);
-    glUniform2f(glGetUniformLocation(program.handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y);
-    glUniform1ui(glGetUniformLocation(program.handle, "gLightIndex"), lightIndex);
+    glUniform2f(glGetUniformLocation(program.handle, "gScreenSize"), (float)app->displaySize.x, (float)app->displaySize.y); //Pass screen size to calculate texture coord
+    glUniform1ui(glGetUniformLocation(program.handle, "gLightIndex"), lightIndex); //Light index since we are rendering one light at a time due to usage of stencil
       
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, app->positionAttachmentHandle);
@@ -1109,6 +1118,7 @@ void PointLightPass(App* app, unsigned int lightIndex)
 
 void DirectionalLightPass(App* app)
 {
+    //Select color attachment 3 to render. Final Render Texture. 
     glDrawBuffer(GL_COLOR_ATTACHMENT3);
 
     glEnable(GL_BLEND);
