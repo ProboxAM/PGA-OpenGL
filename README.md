@@ -31,5 +31,12 @@ The shader can be found inside the [shaders.glsl](https://github.com/ProboxAM/PG
 
 ![Comparison Gif](/images/pomGif.gif)
 
+## Content
+* Combo box to swap between Forward and Deferred Shading.
+* Combo box to select what texture to render in Deferred Shading.
+* Advanced Techniques Settings Window with settings for Parallax Occlusion Mapping
+
+![Settings Image](/images/settings.jpg)
+
 ## Repository
 https://github.com/ProboxAM/PGA-OpenGL
