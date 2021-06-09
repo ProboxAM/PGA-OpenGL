@@ -172,6 +172,12 @@ struct App
     char gpuName[64];
     char openGlVersion[64];
 
+    //Parallax Occlusion Mapping Settings
+    bool discardEdges = true;
+    float heightScale = 0.1f;
+    int minLayers = 32;
+    int maxLayers = 64;
+
     // Camera
     Camera camera = Camera({0.0f, 8.0f, -45.0f});
 

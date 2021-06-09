@@ -462,12 +462,13 @@ void Gui(App* app)
         static const char* modeSelections[]{ "Forward", "Deferred"};
         static int selectedMode = app->mode;
 
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25f);
         if (ImGui::Combo("Render Mode", &selectedMode, modeSelections, ARRAY_COUNT(modeSelections)))
         {
             app->mode = (Mode)selectedMode;
         }
 
-
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25f);
         if (app->mode == Mode::Mode_Deferred)
         {
             static const char* selections[]{ "Position", "Diffuse", "Normals", "Depth", "Final" };
@@ -481,6 +482,18 @@ void Gui(App* app)
     }
     ImGui::Text("FPS: %f", 1.0f/app->deltaTime);
     ImGui::EndMainMenuBar();
+
+    // Window for Advanced Techniques Configuration
+    ImGui::Begin("Advanced Techniques", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::Text("Parallax Occlusion Mapping");
+    ImGui::Spacing();
+    ImGui::SliderFloat("Height Scale", &app->heightScale, 0.0f, 1.f);
+    ImGui::Checkbox("Discard Edges", &app->discardEdges);
+    ImGui::SliderInt("Min layers", &app->minLayers, 0.0f, 100.f);
+    ImGui::SliderInt("Max layers", &app->maxLayers, 0.0f, 100.f);
+
+    ImGui::End();
 }
 
 void Update(App* app)
@@ -828,16 +841,6 @@ void GeometryPass(App* app)
     GLuint drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(ARRAY_COUNT(drawBuffers), drawBuffers);
 
-    // TODO: Draw your textured quad here!
-    // - clear the framebuffer
-    // - set the viewport
-    // - set the blending state
-    // - bind the texture into unit 0
-    // - bind the program 
-    //   (...and make its texture sample from unit 0)
-    // - bind the vao
-    // - glDrawElements() !!!
-
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -845,14 +848,11 @@ void GeometryPass(App* app)
 
     for (const Entity& entity : app->entities)
     {
-
         Model& model = app->models[entity.modelIndex];
         Mesh& mesh = app->meshes[model.meshIdx];
 
         Program& texturedMeshProgram = app->programs[entity.programIdx];
         glUseProgram(texturedMeshProgram.handle);
-
-        //glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(0), app->cbuffer.handle, app->globalParamsOffset, app->globalParamsSize);
 
         glBindBufferRange(GL_UNIFORM_BUFFER, BINDING(1), app->cbuffer.handle, entity.localParamsOffset, entity.localParamsSize);
 
@@ -877,9 +877,12 @@ void GeometryPass(App* app)
                 glBindTexture(GL_TEXTURE_2D, app->textures[submeshMaterial.bumpTextureIdx].handle);
                 glUniform3f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uCameraPos"),
                     app->camera.Position.x, app->camera.Position.y, app->camera.Position.z);
-                glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightScale"), 0.1f);
+                glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "uHeightScale"), app->heightScale);
                 glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "zNear"), app->camera.NearPlane);
                 glUniform1f(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "zFar"), app->camera.FarPlane);
+                glUniform1i(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "discardEdges"), app->discardEdges);
+                glUniform1i(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "minLayers"), app->minLayers);
+                glUniform1i(glGetUniformLocation(app->programs[app->reliefMappingIdx].handle, "maxLayers"), app->maxLayers);
             }
 
             Submesh& submesh = mesh.submeshes[i];

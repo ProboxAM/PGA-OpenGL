@@ -516,6 +516,9 @@ uniform sampler2D uHeightMap;
 uniform float uHeightScale;
 uniform float zNear;
 uniform float zFar;
+uniform bool discardEdges;
+uniform int minLayers;
+uniform int maxLayers;
 
 layout (location = 0) out vec3 gPosition;
 layout (location = 1) out vec4 gAlbedo;
@@ -537,8 +540,12 @@ void main()
 
     float parallaxHeight = 0.0f;
     vec2 BumpedTexCoord = ParallaxMapping(vTexCoord,  viewDir, parallaxHeight);
-    if(BumpedTexCoord.x > 1.0 || BumpedTexCoord.y > 1.0 || BumpedTexCoord.x < 0.0 || BumpedTexCoord.y < 0.0)
+    if(discardEdges)
+    {
+        if(BumpedTexCoord.x > 1.0 || BumpedTexCoord.y > 1.0 || BumpedTexCoord.x < 0.0 || BumpedTexCoord.y < 0.0)
         discard;
+    }
+
 
     // and the diffuse per-fragment color
     gAlbedo = texture(uTexture, BumpedTexCoord);
@@ -547,9 +554,9 @@ void main()
     vec3 tangentSpaceNormal = normalize(texture(uNormalMap, BumpedTexCoord).xyz * 2.0 - 1.0);
     vec3 worldSpaceNormal = normalize(TBN * tangentSpaceNormal);
 
-    vec3 tmpPos = vPosition;
+    /*vec3 tmpPos = vPosition;
     tmpPos += TBN * (parallaxHeight * viewDir);
-    gl_FragDepth = ((tmpPos.z * (zFar + zNear)) + (2 * (zFar * zNear))) / tmpPos.z * (zFar - zNear);
+    gl_FragDepth = ((tmpPos.z * (zFar + zNear)) + (2 * (zFar * zNear))) / tmpPos.z * (zFar - zNear);*/
 
     // also store the per-fragment normals into the gbuffer
     gNormal = worldSpaceNormal;
@@ -558,8 +565,9 @@ void main()
 vec2 ParallaxMapping(in vec2 texCoords, in vec3 viewDir, out float parallaxHeight)
 { 
     // number of depth layers
-    const float minLayers = 32;
-    const float maxLayers = 64;
+    //const float minLayers = 32;
+    //const float maxLayers = 64;
+
     float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));  
     // calculate the size of each layer
     float layerDepth = 1.0 / numLayers;
